@@ -1,0 +1,102 @@
+# docker-compose.standalone.yml
+#
+# Standalone deployment — pulls a pre-built image from GHCR, no source
+# checkout required. Drop this file plus an `.env` file into any
+# directory and run `docker compose -f docker-compose.standalone.yml up -d`.
+#
+# Get an image tag from:
+#   https://github.com/mia-clark/frp-manager-server/pkgs/container/frp-manager-server
+#
+# Quick start:
+#   curl -O https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/deploy/docker-compose.standalone.yml
+#   curl -O https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/deploy/.env.example
+#   mv .env.example .env
+#   # edit .env: set FRPMGR_API_TOKEN to a long random string
+#   docker compose -f docker-compose.standalone.yml up -d
+#   curl http://localhost:8080/api/v1/health
+
+services:
+  frpmgrd:
+    image: ghcr.io/mia-clark/frp-manager-server:${FRPMGR_IMAGE_TAG:-latest}
+    container_name: frpmgrd
+    restart: unless-stopped
+
+    # ------------------------------------------------------------------
+    # Network mode — pick ONE of the two blocks below.
+    #
+    # (A) host network  [recommended]
+    #     frpc out-bound connections and xtcp/NAT hole-punching work
+    #     without surprises. The API still listens on the host's
+    #     FRPMGR_HTTP_PORT (default 8080).
+    # ------------------------------------------------------------------
+    network_mode: host
+
+    # ------------------------------------------------------------------
+    # (B) bridge network  [stricter isolation, comment out (A) and
+    #     uncomment this block + the `ports:` section]
+    # ------------------------------------------------------------------
+    # networks:
+    #   - frpmgr
+    # ports:
+    #   - "${FRPMGR_HTTP_PORT:-8080}:8080"
+    #   # add explicit port mappings for every frpc local_port you proxy:
+    #   # - "22:22"
+    #   # - "8080:8080"
+
+    environment:
+      # --- required ---
+      FRPMGR_API_TOKEN: ${FRPMGR_API_TOKEN:?api token required (set in .env)}
+
+      # --- optional ---
+      FRPMGR_HTTP_ADDR: ":${FRPMGR_HTTP_PORT:-8080}"
+      FRPMGR_CORS_ORIGINS: ${FRPMGR_CORS_ORIGINS:-*}
+      FRPMGR_LOG_LEVEL: ${FRPMGR_LOG_LEVEL:-info}
+      FRPMGR_DOCS_ENABLED: ${FRPMGR_DOCS_ENABLED:-true}
+      TZ: ${TZ:-UTC}
+
+    volumes:
+      - ${FRPMGR_DATA_DIR:-./data}:/data
+
+    healthcheck:
+      test:
+        - CMD
+        - /usr/local/bin/frpmgrd
+        - health
+        - -addr
+        - http://127.0.0.1:${FRPMGR_HTTP_PORT:-8080}
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+    # ------------------------------------------------------------------
+    # Log rotation — Docker's default json-file driver grows without
+    # bound. These limits keep at most 50 MB of logs per container.
+    # ------------------------------------------------------------------
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    # ------------------------------------------------------------------
+    # Resource hints. Comment out if you don't use compose v2 deploy
+    # constraints. Defaults are generous; the daemon idles at ~30 MB.
+    # ------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          memory: ${FRPMGR_MEMORY_LIMIT:-512M}
+        reservations:
+          memory: 64M
+
+    # ------------------------------------------------------------------
+    # Optional: opt-in to Watchtower for unattended image updates.
+    # https://containrrr.dev/watchtower/
+    # ------------------------------------------------------------------
+    labels:
+      com.centurylinklabs.watchtower.enable: "${FRPMGR_AUTOUPDATE:-false}"
+
+# networks:
+#   frpmgr:
+#     driver: bridge

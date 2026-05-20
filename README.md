@@ -39,10 +39,24 @@ curl -L https://github.com/mia-clark/frp-manager-server/releases/latest/download
 FRPMGR_API_TOKEN=$(openssl rand -hex 32) ./frpmgrd serve
 ```
 
-### Option C — docker compose (build locally)
+### Option C — standalone docker compose (no source checkout)
 
 ```bash
-cd deploy/
+# In any empty directory:
+curl -O https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/deploy/docker-compose.standalone.yml
+curl -O https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/deploy/.env.example
+mv .env.example .env
+# Edit .env: set FRPMGR_API_TOKEN
+docker compose -f docker-compose.standalone.yml up -d
+```
+
+Pulls from `ghcr.io`, no local build. Includes log rotation, resource limits, Watchtower opt-in label, and host/bridge network blocks you can swap. Pin a specific image with `FRPMGR_IMAGE_TAG=v0.1.0`.
+
+### Option D — docker compose (build locally)
+
+```bash
+git clone https://github.com/mia-clark/frp-manager-server.git
+cd frp-manager-server/deploy
 cp .env.example .env       # paste a real token
 docker compose up -d --build
 curl http://localhost:8080/api/v1/health
