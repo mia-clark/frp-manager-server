@@ -48,7 +48,7 @@ const MainLayout: React.FC = () => {
     try {
       const resp = await client.get('/api/v1/version');
       if (resp.status === 200) {
-        setVersion(resp.data.version || '');
+        setVersion(resp.data.daemon || resp.data.version || '');
         setFrpVer(resp.data.frp || '');
       }
     } catch {

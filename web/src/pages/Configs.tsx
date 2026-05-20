@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import {
   Card, Row, Col, Button, Badge, Space, Typography, Popconfirm,
   Tabs, Form, Input, InputNumber, Switch, Table, Drawer, Modal,
-  message, Tag, Tooltip, Empty, List, Skeleton, Radio, Select
+  message, Tag, Tooltip, Empty, List, Skeleton, Radio, Select,
+  theme as antdTheme,
 } from 'antd';
 import {
   PlayCircleOutlined,
@@ -31,6 +32,7 @@ interface ConfigItem {
 }
 
 const Configs: React.FC = () => {
+  const { token } = antdTheme.useToken();
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [activeConfigId, setActiveConfigId] = useState<string>('');
   const [statusLoading, setStatusLoading] = useState<Record<string, boolean>>({});
@@ -493,11 +495,11 @@ const Configs: React.FC = () => {
       }
       if (editingProxy) {
         // 修改代理
-        await client.put(`/api/v1/configs/${activeConfigId}/proxies/${editingProxy.name}`, payload);
+        await client.put(`/api/v1/configs/${activeConfigId}/proxies/${editingProxy.name}`, { proxy: payload });
         message.success('代理规则修改成功');
       } else {
         // 新建代理
-        await client.post(`/api/v1/configs/${activeConfigId}/proxies`, payload);
+        await client.post(`/api/v1/configs/${activeConfigId}/proxies`, { proxy: payload });
         message.success('代理规则创建成功');
       }
       setProxyDrawerOpen(false);
@@ -552,7 +554,7 @@ const Configs: React.FC = () => {
       case 'stopping':
         return <Badge status="processing" text={<span style={{ color: '#faad14' }}>停止中</span>} />;
       default:
-        return <Badge status="default" text={<span style={{ color: 'rgba(255,255,255,0.45)' }}>未启动</span>} />;
+        return <Badge status="default" text={<span>未启动</span>} />;
     }
   };
 
@@ -561,17 +563,12 @@ const Configs: React.FC = () => {
       <Row gutter={16} style={{ height: '100%', minHeight: '580px' }}>
         {/* 左栏：实例卡片列表 */}
         <Col xs={24} md={8} style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'between', alignItems: 'center', marginBottom: '16px' }}>
-            <Title level={4} style={{ color: '#fff', margin: 0 }}>配置列表</Title>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Title level={4} style={{ margin: 0 }}>配置列表</Title>
             <Button
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => setNewConfigModalOpen(true)}
-              style={{
-                background: 'linear-gradient(135deg, #1677ff 0%, #0050b3 100%)',
-                border: 'none',
-                marginLeft: 'auto'
-              }}
             >
               新建配置
             </Button>
@@ -579,8 +576,8 @@ const Configs: React.FC = () => {
 
           <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
             {configs.length === 0 ? (
-              <Card className="glass-card" bordered={false} style={{ textAlign: 'center', padding: '40px 0' }}>
-                <Empty description={<span style={{ color: 'rgba(255,255,255,0.45)' }}>暂无配置文件，点击右上角创建。</span>} />
+              <Card style={{ textAlign: 'center', padding: '40px 0', borderRadius: 10 }}>
+                <Empty description="暂无配置文件，点击右上角创建。" />
               </Card>
             ) : (
               <List
@@ -590,27 +587,27 @@ const Configs: React.FC = () => {
                   const isRunning = item.state === 'started';
                   return (
                     <Card
-                      className="glass-card"
-                      bordered={false}
+                      hoverable
                       style={{
-                        marginBottom: '12px',
+                        marginBottom: 12,
                         cursor: 'pointer',
-                        border: isActive ? '1px solid #1677ff' : '1px solid rgba(255, 255, 255, 0.05)',
-                        background: isActive ? 'rgba(22, 119, 255, 0.08)' : 'rgba(20, 24, 30, 0.65)',
-                        boxShadow: isActive ? '0 0 15px rgba(22,119,255,0.15)' : 'none',
+                        border: `1px solid ${isActive ? token.colorPrimary : token.colorBorderSecondary}`,
+                        background: isActive ? token.colorPrimaryBg : token.colorBgContainer,
+                        boxShadow: isActive ? `0 0 0 2px ${token.colorPrimaryBg}` : undefined,
+                        borderRadius: 10,
                       }}
                       onClick={() => setActiveConfigId(item.id)}
-                      bodyStyle={{ padding: '16px' }}
+                      styles={{ body: { padding: 16 } }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
                         <div>
-                          <Text strong style={{ color: '#fff', fontSize: '15px' }}>{item.name || item.id}</Text>
+                          <Text strong style={{ fontSize: '15px' }}>{item.name || item.id}</Text>
                           <div><Text type="secondary" style={{ fontSize: '12px' }}>ID: {item.id}</Text></div>
                         </div>
                         {getStatusBadge(item.state)}
                       </div>
 
-                      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', margin: '8px 0' }} />
+                      <div style={{ borderBottom: `1px solid ${token.colorBorderSecondary}`, margin: '8px 0' }} />
 
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Space>
@@ -652,7 +649,6 @@ const Configs: React.FC = () => {
                             <Button
                               size="small"
                               type="text"
-                              style={{ color: 'rgba(255,255,255,0.45)' }}
                               icon={<CopyOutlined />}
                               onClick={(e) => { e.stopPropagation(); handleDuplicateConfig(item.id); }}
                             />
@@ -687,15 +683,14 @@ const Configs: React.FC = () => {
         <Col xs={24} md={16}>
           {activeConfigId ? (
             <Card
-              className="glass-card"
               bordered={false}
-              bodyStyle={{ padding: '20px' }}
-              style={{ height: '100%', minHeight: '520px', display: 'flex', flexDirection: 'column' }}
+              styles={{ body: { padding: 20 } }}
+              style={{ height: '100%', minHeight: '520px', display: 'flex', flexDirection: 'column', borderRadius: 10 }}
             >
               <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <Text type="secondary" style={{ fontSize: '12px' }}>当前操作实例</Text>
-                  <Title level={4} style={{ color: '#fff', margin: '4px 0 0 0' }}>
+                  <Title level={4} style={{ margin: '4px 0 0 0' }}>
                     {configs.find(c => c.id === activeConfigId)?.name || activeConfigId}
                   </Title>
                 </div>
@@ -736,7 +731,7 @@ const Configs: React.FC = () => {
                             {
                               title: '代理名称',
                               dataIndex: 'name',
-                              render: (_, record) => <Text style={{ color: '#fff' }}>{record.name}</Text>
+                              render: (_, record) => <Text>{record.name}</Text>
                             },
                             {
                               title: '类型',
@@ -745,7 +740,7 @@ const Configs: React.FC = () => {
                             },
                             {
                               title: '本地地址',
-                              render: (_, record) => <Text style={{ color: 'rgba(255,255,255,0.65)' }}>{record.localIP}:{record.localPort}</Text>
+                              render: (_, record) => <Text type="secondary">{record.localIP}:{record.localPort}</Text>
                             },
                             {
                               title: '公网代理端口',
@@ -754,7 +749,7 @@ const Configs: React.FC = () => {
                                 if (record.type === 'http' || record.type === 'https') {
                                   return <Text type="secondary">{record.customDomains?.join(', ') || '自定义域名'}</Text>;
                                 }
-                                return <Text style={{ color: '#fff' }}>{port || '-'}</Text>;
+                                return <Text>{port || '-'}</Text>;
                               }
                             },
                             {
@@ -804,7 +799,7 @@ const Configs: React.FC = () => {
                         <Tabs
                           type="line"
                           size="small"
-                          tabBarStyle={{ marginBottom: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}
+                          tabBarStyle={{ marginBottom: 16, borderBottom: `1px solid ${token.colorBorderSecondary}` }}
                           items={[
                             {
                               key: 'basic',
@@ -813,12 +808,12 @@ const Configs: React.FC = () => {
                                 <div>
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>实例备注名</span>} name="name">
+                                      <Form.Item label={<span>实例备注名</span>} name="name">
                                         <Input placeholder="例如: 杭州云服务器" />
                                       </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>用户名 (User)</span>} name="user">
+                                      <Form.Item label={<span>用户名 (User)</span>} name="user">
                                         <Input placeholder="可作为代理名前缀标识，例如: hlj-win-221" />
                                       </Form.Item>
                                     </Col>
@@ -826,7 +821,7 @@ const Configs: React.FC = () => {
                                   <Row gutter={16}>
                                     <Col span={16}>
                                       <Form.Item
-                                        label={<span style={{ color: '#fff' }}>FRP 服务端公网地址 (server_addr)</span>}
+                                        label={<span>FRP 服务端公网地址 (server_addr)</span>}
                                         name="serverAddr"
                                         rules={[{ required: true, message: '请输入 FRP 服务端地址' }]}
                                       >
@@ -835,7 +830,7 @@ const Configs: React.FC = () => {
                                     </Col>
                                     <Col span={8}>
                                       <Form.Item
-                                        label={<span style={{ color: '#fff' }}>服务端端口 (server_port)</span>}
+                                        label={<span>服务端端口 (server_port)</span>}
                                         name="serverPort"
                                         rules={[{ required: true, message: '必填' }]}
                                       >
@@ -845,12 +840,12 @@ const Configs: React.FC = () => {
                                   </Row>
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>随系统服务自动启动</span>} name="manualStart" valuePropName="checked">
+                                      <Form.Item label={<span>随系统服务自动启动</span>} name="manualStart" valuePropName="checked">
                                         <Switch checkedChildren="随服务启动" unCheckedChildren="手动启动" />
                                       </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>STUN 服务地址</span>} name="natHoleSTUNServer">
+                                      <Form.Item label={<span>STUN 服务地址</span>} name="natHoleSTUNServer">
                                         <Input placeholder="用于 Nat 穿透，例如: stun.easyvoip.com:3478" />
                                       </Form.Item>
                                     </Col>
@@ -863,7 +858,7 @@ const Configs: React.FC = () => {
                               label: '认证',
                               children: (
                                 <div>
-                                  <Form.Item label={<span style={{ color: '#fff' }}>认证方式</span>} name="authMethod">
+                                  <Form.Item label={<span>认证方式</span>} name="authMethod">
                                     <Radio.Group buttonStyle="solid">
                                       <Radio.Button value="token">Token 认证</Radio.Button>
                                       <Radio.Button value="oidc">OIDC 认证</Radio.Button>
@@ -880,7 +875,7 @@ const Configs: React.FC = () => {
                                       if (authMethod === 'token') {
                                         return (
                                           <Form.Item
-                                            label={<span style={{ color: '#fff' }}>Token 密钥 (auth.token)</span>}
+                                            label={<span>Token 密钥 (auth.token)</span>}
                                             name="authToken"
                                             rules={[{ required: true, message: '请输入 Token 密钥' }]}
                                           >
@@ -893,29 +888,29 @@ const Configs: React.FC = () => {
                                           <div>
                                             <Row gutter={16}>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>OIDC 客户端 ID</span>} name="oidcClientId">
+                                                <Form.Item label={<span>OIDC 客户端 ID</span>} name="oidcClientId">
                                                   <Input placeholder="clientId" />
                                                 </Form.Item>
                                               </Col>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>OIDC 客户端密钥</span>} name="oidcClientSecret">
+                                                <Form.Item label={<span>OIDC 客户端密钥</span>} name="oidcClientSecret">
                                                   <Input.Password placeholder="clientSecret" />
                                                 </Form.Item>
                                               </Col>
                                             </Row>
                                             <Row gutter={16}>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>受众 (Audience)</span>} name="oidcAudience">
+                                                <Form.Item label={<span>受众 (Audience)</span>} name="oidcAudience">
                                                   <Input placeholder="audience" />
                                                 </Form.Item>
                                               </Col>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>作用域 (Scope)</span>} name="oidcScope">
+                                                <Form.Item label={<span>作用域 (Scope)</span>} name="oidcScope">
                                                   <Input placeholder="scope" />
                                                 </Form.Item>
                                               </Col>
                                             </Row>
-                                            <Form.Item label={<span style={{ color: '#fff' }}>Token 端点 URL</span>} name="oidcTokenEndpoint">
+                                            <Form.Item label={<span>Token 端点 URL</span>} name="oidcTokenEndpoint">
                                               <Input placeholder="https://oauth2.example.com/token" />
                                             </Form.Item>
                                           </div>
@@ -933,8 +928,8 @@ const Configs: React.FC = () => {
                               children: (
                                 <Row gutter={16}>
                                   <Col span={12}>
-                                    <Form.Item label={<span style={{ color: '#fff' }}>日志级别 (log.level)</span>} name="logLevel">
-                                      <Select dropdownStyle={{ background: '#1f1f1f' }}>
+                                    <Form.Item label={<span>日志级别 (log.level)</span>} name="logLevel">
+                                      <Select>
                                         <Select.Option value="trace">trace (最详细)</Select.Option>
                                         <Select.Option value="debug">debug (调试)</Select.Option>
                                         <Select.Option value="info">info (常规信息)</Select.Option>
@@ -944,7 +939,7 @@ const Configs: React.FC = () => {
                                     </Form.Item>
                                   </Col>
                                   <Col span={12}>
-                                    <Form.Item label={<span style={{ color: '#fff' }}>日志保留天数 (log.max_days)</span>} name="logMaxDays">
+                                    <Form.Item label={<span>日志保留天数 (log.max_days)</span>} name="logMaxDays">
                                       <InputNumber min={1} max={90} style={{ width: '100%' }} />
                                     </Form.Item>
                                   </Col>
@@ -958,36 +953,36 @@ const Configs: React.FC = () => {
                                 <div>
                                   <Row gutter={16}>
                                     <Col span={16}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>管理 HTTP 监听地址 (webServer.addr)</span>} name="adminAddr">
+                                      <Form.Item label={<span>管理 HTTP 监听地址 (webServer.addr)</span>} name="adminAddr">
                                         <Input placeholder="127.0.0.1" />
                                       </Form.Item>
                                     </Col>
                                     <Col span={8}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>管理端口</span>} name="adminPort">
+                                      <Form.Item label={<span>管理端口</span>} name="adminPort">
                                         <InputNumber min={1} max={65535} style={{ width: '100%' }} placeholder="7400" />
                                       </Form.Item>
                                     </Col>
                                   </Row>
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>管理用户名</span>} name="adminUser">
+                                      <Form.Item label={<span>管理用户名</span>} name="adminUser">
                                         <Input placeholder="admin" />
                                       </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>管理密码</span>} name="adminPwd">
+                                      <Form.Item label={<span>管理密码</span>} name="adminPwd">
                                         <Input.Password placeholder="admin" />
                                       </Form.Item>
                                     </Col>
                                   </Row>
                                   <Row gutter={16}>
                                     <Col span={16}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>管理后台静态资源目录</span>} name="assetsDir">
+                                      <Form.Item label={<span>管理后台静态资源目录</span>} name="assetsDir">
                                         <Input placeholder="填入本地静态网页路径可托管仪表盘" />
                                       </Form.Item>
                                     </Col>
                                     <Col span={8}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>Pprof 调试服务</span>} name="pprofEnable" valuePropName="checked">
+                                      <Form.Item label={<span>Pprof 调试服务</span>} name="pprofEnable" valuePropName="checked">
                                         <Switch checkedChildren="已开启" unCheckedChildren="关闭" />
                                       </Form.Item>
                                     </Col>
@@ -1002,8 +997,8 @@ const Configs: React.FC = () => {
                                 <div>
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>传输层协议 (transport.protocol)</span>} name="protocol">
-                                        <Select dropdownStyle={{ background: '#1f1f1f' }}>
+                                      <Form.Item label={<span>传输层协议 (transport.protocol)</span>} name="protocol">
+                                        <Select>
                                           <Select.Option value="tcp">TCP 协议 (默认)</Select.Option>
                                           <Select.Option value="kcp">KCP 协议 (UDP加速)</Select.Option>
                                           <Select.Option value="quic">QUIC 协议</Select.Option>
@@ -1013,48 +1008,48 @@ const Configs: React.FC = () => {
                                       </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>连接超时时间 (秒)</span>} name="dialServerTimeout">
+                                      <Form.Item label={<span>连接超时时间 (秒)</span>} name="dialServerTimeout">
                                         <InputNumber min={1} style={{ width: '100%' }} />
                                       </Form.Item>
                                     </Col>
                                   </Row>
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>保活心跳间隔 (秒)</span>} name="heartbeatInterval">
+                                      <Form.Item label={<span>保活心跳间隔 (秒)</span>} name="heartbeatInterval">
                                         <InputNumber min={1} style={{ width: '100%' }} />
                                       </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>心跳超时阈值 (秒)</span>} name="heartbeatTimeout">
+                                      <Form.Item label={<span>心跳超时阈值 (秒)</span>} name="heartbeatTimeout">
                                         <InputNumber min={1} style={{ width: '100%' }} />
                                       </Form.Item>
                                     </Col>
                                   </Row>
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>连接池初始数量 (pool_count)</span>} name="poolCount">
+                                      <Form.Item label={<span>连接池初始数量 (pool_count)</span>} name="poolCount">
                                         <InputNumber min={0} max={100} style={{ width: '100%' }} />
                                       </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>多路复用 (TCP Mux)</span>} name="tcpMux" valuePropName="checked">
+                                      <Form.Item label={<span>多路复用 (TCP Mux)</span>} name="tcpMux" valuePropName="checked">
                                         <Switch checkedChildren="已启用" unCheckedChildren="禁用" />
                                       </Form.Item>
                                     </Col>
                                   </Row>
 
-                                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', margin: '16px 0 12px 0', paddingTop: '12px' }}>
-                                    <Text strong style={{ color: '#fff', fontSize: '13px' }}>FRP TLS 安全通讯</Text>
+                                  <div style={{ borderTop: `1px solid ${token.colorBorderSecondary}`, margin: '16px 0 12px 0', paddingTop: 12 }}>
+                                    <Text strong style={{ fontSize: 13 }}>FRP TLS 安全通讯</Text>
                                   </div>
 
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>强制启用 TLS 传输加密</span>} name="tlsEnable" valuePropName="checked">
+                                      <Form.Item label={<span>强制启用 TLS 传输加密</span>} name="tlsEnable" valuePropName="checked">
                                         <Switch checkedChildren="已开启" unCheckedChildren="未启用" />
                                       </Form.Item>
                                     </Col>
                                     <Col span={12}>
-                                      <Form.Item label={<span style={{ color: '#fff' }}>禁用 TLS 首字节校验</span>} name="disableCustomTLSFirstByte" valuePropName="checked">
+                                      <Form.Item label={<span>禁用 TLS 首字节校验</span>} name="disableCustomTLSFirstByte" valuePropName="checked">
                                         <Switch checkedChildren="已禁用" unCheckedChildren="校验首字节" />
                                       </Form.Item>
                                     </Col>
@@ -1070,24 +1065,24 @@ const Configs: React.FC = () => {
                                           <div>
                                             <Row gutter={16}>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>客户端证书文件路径</span>} name="tlsCertFile">
+                                                <Form.Item label={<span>客户端证书文件路径</span>} name="tlsCertFile">
                                                   <Input placeholder="C:\certs\client.crt" />
                                                 </Form.Item>
                                               </Col>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>客户端私钥文件路径</span>} name="tlsKeyFile">
+                                                <Form.Item label={<span>客户端私钥文件路径</span>} name="tlsKeyFile">
                                                   <Input placeholder="C:\certs\client.key" />
                                                 </Form.Item>
                                               </Col>
                                             </Row>
                                             <Row gutter={16}>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>受信任 CA 证书</span>} name="tlsTrustedCaFile">
+                                                <Form.Item label={<span>受信任 CA 证书</span>} name="tlsTrustedCaFile">
                                                   <Input placeholder="C:\certs\ca.crt" />
                                                 </Form.Item>
                                               </Col>
                                               <Col span={12}>
-                                                <Form.Item label={<span style={{ color: '#fff' }}>TLS 校验域名 (ServerName)</span>} name="tlsServerName">
+                                                <Form.Item label={<span>TLS 校验域名 (ServerName)</span>} name="tlsServerName">
                                                   <Input placeholder="frp.yourdomain.com" />
                                                 </Form.Item>
                                               </Col>
@@ -1104,7 +1099,7 @@ const Configs: React.FC = () => {
                           ]}
                         />
 
-                        <Form.Item style={{ marginTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '16px', textAlign: 'right' }}>
+                        <Form.Item style={{ marginTop: 20, borderTop: `1px solid ${token.colorBorderSecondary}`, paddingTop: 16, textAlign: 'right' }}>
                           <Button type="primary" htmlType="submit">保存全部客户端配置</Button>
                         </Form.Item>
                       </Form>
@@ -1132,11 +1127,8 @@ const Configs: React.FC = () => {
                           onChange={(e) => setRawToml(e.target.value)}
                           rows={15}
                           style={{
-                            fontFamily: 'Fira Code, monospace',
-                            fontSize: '13px',
-                            background: '#08090a',
-                            color: '#e6ebf1',
-                            borderColor: 'rgba(255,255,255,0.08)'
+                            fontFamily: 'ui-monospace, "Fira Code", monospace',
+                            fontSize: 13,
                           }}
                         />
                       </div>
@@ -1165,8 +1157,8 @@ const Configs: React.FC = () => {
               />
             </Card>
           ) : (
-            <Card className="glass-card" bordered={false} style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '100px 0' }}>
-              <Empty description={<span style={{ color: 'rgba(255,255,255,0.45)' }}>请在左侧选择或创建一个配置文件。</span>} />
+            <Card style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '100px 0', borderRadius: 10 }}>
+              <Empty description="请在左侧选择或创建一个配置文件。" />
             </Card>
           )}
         </Col>
@@ -1218,7 +1210,7 @@ const Configs: React.FC = () => {
         width={520}
         onClose={() => setProxyDrawerOpen(false)}
         open={proxyDrawerOpen}
-        bodyStyle={{ paddingBottom: 80 }}
+        styles={{ body: { paddingBottom: 80 } }}
         footer={
           <div style={{ textAlign: 'right' }}>
             <Space>

@@ -25,10 +25,11 @@ interface NatResult {
 
 const STUN_PRESETS = [
   { value: 'stun.easyvoip.com:3478', label: 'EasyVoIP (推荐)' },
-  { value: 'stun.miwifi.com:3478', label: '小米 (国内)' },
-  { value: 'stun.qq.com:3478', label: 'QQ (国内)' },
+  //{ value: 'stun.openrelayproject.org:3478', label: 'OpenRelay (海外)' },
   { value: 'stun.l.google.com:19302', label: 'Google (海外)' },
   { value: 'stun.cloudflare.com:3478', label: 'Cloudflare (海外)' },
+  { value: 'global.stun.twilio.com:3478', label: 'Twilio (海外)' },
+  //{ value: 'stun.sipgate.net:3478', label: 'SIPgate (海外)' },
 ];
 
 function inferNatType(addrs: string[]): { type: string; color: string; tip: string } {
