@@ -15,46 +15,17 @@
 #   docker compose -f docker-compose.standalone.yml up -d
 #   curl http://localhost:8080/api/v1/health
 #
-# Storage — IMPORTANT
-#   The image runs as nonroot (UID 65532) for security. This file uses a
-#   named volume by default so Docker can pre-seed it from the image
-#   with the right permissions; nothing to chown.
-#
-#   If you prefer a host bind-mount (e.g. to edit profiles/*.toml
-#   directly from the host) switch the volumes section to the bind
-#   block below — the `init-permissions` sidecar will chown the host
-#   directory to 65532:65532 before the daemon starts.
+# Storage
+#   The image initializes /data ownership internally on startup
+#   (entrypoint runs as root briefly, then drops to UID 65532 via
+#   su-exec). Works the same for named volumes and host bind mounts —
+#   no sidecar, no host-side chown needed.
 
 services:
-  # Runs once at startup, chown's the bind-mounted /data so the nonroot
-  # daemon can write to it, then exits. No-op if you use the named
-  # volume (you can leave it enabled either way — it's idempotent).
-  init-permissions:
-    image: busybox:1.37
-    container_name: docker_frpmgrd_init
-    user: "0:0"
-    restart: "no"
-    command:
-      - sh
-      - -c
-      - >-
-        mkdir -p /data/profiles /data/logs /data/stores &&
-        chown -R 65532:65532 /data &&
-        echo "permissions ok"
-    volumes:
-      - frpmgr-data:/data
-      # If you switch to a bind mount, also switch this volume so the
-      # sidecar can prepare it:
-      # - ${FRPMGR_DATA_DIR:-./data}:/data
-
   frpmgrd:
     image: ghcr.io/mia-clark/frp-manager-server:${FRPMGR_IMAGE_TAG:-latest}
     container_name: docker_frpmgrd
     restart: always
-
-    depends_on:
-      init-permissions:
-        condition: service_completed_successfully
 
     # ------------------------------------------------------------------
     # Network mode — pick ONE of the two blocks below.
@@ -90,9 +61,9 @@ services:
       TZ: ${TZ:-UTC}
 
     # ------------------------------------------------------------------
-    # Storage — default is a docker named volume (zero permission
-    # hassle). To use a host bind mount instead, swap the volumes
-    # entry below AND the matching entry in init-permissions above.
+    # Storage — default is a docker named volume. Swap to a host bind
+    # mount if you want to edit profiles/*.toml directly from the host;
+    # the entrypoint will chown it on first start either way.
     # ------------------------------------------------------------------
     volumes:
       - frpmgr-data:/data
