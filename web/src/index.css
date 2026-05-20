@@ -1,0 +1,134 @@
+:root {
+  font-family: 'Inter', 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  background-color: #0b0d0f;
+  color: rgba(255, 255, 255, 0.87);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 50%, #12161b 0%, #0b0d0f 100%);
+  overflow: hidden;
+}
+
+/* 酷炫滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 玻璃拟态卡片样式 */
+.glass-card {
+  background: rgba(20, 24, 30, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.glass-card:hover {
+  border-color: rgba(22, 119, 255, 0.3);
+  box-shadow: 0 12px 40px 0 rgba(22, 119, 255, 0.08);
+}
+
+/* 霓虹正常状态绿色呼吸灯 */
+@keyframes active-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(82, 196, 26, 0.3), 0 0 10px rgba(82, 196, 26, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(82, 196, 26, 0.7), 0 0 20px rgba(82, 196, 26, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(82, 196, 26, 0.3), 0 0 10px rgba(82, 196, 26, 0.2);
+  }
+}
+.status-indicator-running {
+  width: 8px;
+  height: 8px;
+  background-color: #52c41a;
+  border-radius: 50%;
+  display: inline-block;
+  animation: active-glow 2s infinite ease-in-out;
+}
+
+/* 错误状态红色呼吸灯 */
+@keyframes error-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(255, 77, 79, 0.3), 0 0 10px rgba(255, 77, 79, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(255, 77, 79, 0.7), 0 0 20px rgba(255, 77, 79, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(255, 77, 79, 0.3), 0 0 10px rgba(255, 77, 79, 0.2);
+  }
+}
+.status-indicator-error {
+  width: 8px;
+  height: 8px;
+  background-color: #ff4d4f;
+  border-radius: 50%;
+  display: inline-block;
+  animation: error-glow 2s infinite ease-in-out;
+}
+
+/* 停止状态灰色灯 */
+.status-indicator-stopped {
+  width: 8px;
+  height: 8px;
+  background-color: #bfbfbf;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* 极客终端日志外观 */
+.terminal-container {
+  background-color: #08090a;
+  border: 1px solid #1a1e22;
+  border-radius: 8px;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-size: 13px;
+  color: #c5c6c7;
+  padding: 12px;
+  overflow-y: auto;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+}
+.log-line {
+  margin: 0;
+  padding: 2px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.log-info { color: #52c41a; }
+.log-warn { color: #faad14; }
+.log-error { color: #ff4d4f; }
+.log-debug { color: #1677ff; }
+
+/* 菜单导航栏激活发光 */
+.ant-menu-dark .ant-menu-item-selected {
+  background-color: rgba(22, 119, 255, 0.15) !important;
+  border-right: 3px solid #1677ff;
+}
