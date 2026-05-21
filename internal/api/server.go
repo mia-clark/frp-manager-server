@@ -3,12 +3,14 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/mia-clark/frp-manager-server/internal/api/middleware"
 	"github.com/mia-clark/frp-manager-server/internal/appcfg"
 	"github.com/mia-clark/frp-manager-server/internal/manager"
+	"github.com/mia-clark/frp-manager-server/web"
 )
 
 // Deps bundles the collaborators that handlers need.
@@ -102,6 +104,34 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/api/v1/system/network", sys.Network)
 		r.Get("/api/v1/system/connections", sys.Connections)
 		r.Get("/api/v1/system/process", sys.Process)
+	})
+
+	// WebUI 静态文件分发 & SPA 路由兼容
+	webFS := web.GetFS()
+	fileServer := http.FileServer(http.FS(webFS))
+
+	r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+		// 如果是未匹配的 api 请求，不应该回退到前端，直接 404
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
+
+		filePath := strings.TrimPrefix(r.URL.Path, "/")
+		if filePath == "" {
+			filePath = "index.html"
+		}
+
+		// 检查内嵌的文件系统中是否存在请求的文件
+		f, err := webFS.Open(filePath)
+		if err != nil {
+			// 文件不存在，重写请求路径为 index.html 达成前端 SPA 路由接管
+			r.URL.Path = "/index.html"
+		} else {
+			f.Close()
+		}
+
+		fileServer.ServeHTTP(w, r)
 	})
 
 	return r
