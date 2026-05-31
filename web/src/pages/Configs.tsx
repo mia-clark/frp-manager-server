@@ -395,7 +395,9 @@ const Configs: React.FC = () => {
           // 注意：后端 loginFailExit 是 *bool（nil/true=登录失败立即退出，false=无限重试）
           // 本项目 NewDefaultClientConfigV1 默认为 false，与上游 frp 不同。
           loginFailExit: configData.loginFailExit ?? false,
-          manualStart: configData.frpmgr?.manualStart ?? false,
+          // 开关代表「自启」，与 manualStart 语义相反：manualStart 缺省/false = 自启，
+          // 故默认开关为开（autoStart=true）
+          autoStart: !(configData.frpmgr?.manualStart ?? false),
           // 认证
           authMethod: configData.auth?.method || 'token',
           authToken: configData.auth?.token || '',
@@ -603,7 +605,7 @@ const Configs: React.FC = () => {
           frpmgr: {
             ...(detailConfig?.config?.frpmgr ?? {}),
             name: values.name,
-            manualStart: values.manualStart,
+            manualStart: !values.autoStart,
           }
         }
       };
@@ -653,7 +655,8 @@ const Configs: React.FC = () => {
           },
           frpmgr: {
             name: values.name || values.id,
-            manualStart: false,
+            // autoStart 开关 → manualStart 取反（默认自启）
+            manualStart: !(values.autoStart ?? true),
           }
         }
       };
@@ -1263,7 +1266,7 @@ const Configs: React.FC = () => {
                                   </Row>
                                   <Row gutter={16}>
                                     <Col span={12}>
-                                      <Form.Item label={<span>随系统服务自动启动</span>} name="manualStart" valuePropName="checked">
+                                      <Form.Item label={<span>随系统服务自动启动</span>} name="autoStart" valuePropName="checked" initialValue={true}>
                                         <Switch checkedChildren="随服务启动" unCheckedChildren="手动启动" />
                                       </Form.Item>
                                     </Col>
@@ -1731,6 +1734,9 @@ const Configs: React.FC = () => {
           </Form.Item>
           <Form.Item label="密钥 Token" name="token">
             <Input.Password placeholder="可空" />
+          </Form.Item>
+          <Form.Item label="随系统服务自动启动" name="autoStart" valuePropName="checked" initialValue={true}>
+            <Switch checkedChildren="随服务启动" unCheckedChildren="手动启动" />
           </Form.Item>
           <Form.Item style={{ textAlign: 'right', marginBottom: 0 }}>
             <Space>
