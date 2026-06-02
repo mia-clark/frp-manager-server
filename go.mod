@@ -8,7 +8,7 @@ require (
 	github.com/fatedier/golib v0.7.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-chi/chi/v5 v5.2.5
-	github.com/pelletier/go-toml/v2 v2.2.0
+	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/samber/lo v1.47.0
 	github.com/shirou/gopsutil/v4 v4.26.4
 	gopkg.in/ini.v1 v1.67.0
