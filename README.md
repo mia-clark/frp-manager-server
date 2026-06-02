@@ -23,77 +23,117 @@
 
 ## 🚀 一键安装（推荐，macOS / Linux）
 
-复制下面**任意一条**命令到终端回车即可。脚本会自动识别你的系统和 CPU 架构，下载对应版本，安装并注册成开机自启的系统服务。
+脚本会自动识别你的系统和 CPU 架构，下载对应版本，安装并注册成开机自启的系统服务。**国内服务器请用下面的镜像加速地址，复制整行回车即可。**
 
-**使用 curl：**
+### ⚡ 复制即用（国内镜像加速）
+
+> 下面所有命令都用主镜像 `gh-raw.966788.xyz`。如果某个域名不通，把命令里的域名换成任意一个[备用域名](#-镜像域名主用--备用)即可，路径不变。
+
+**最简单：交互安装**（回车逐步选端口、令牌）
 
 ```sh
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh
+```
+
+**全自动安装**（一行搞定，不问任何问题）：
+
+```sh
+# 默认端口 8080 + 自动生成强随机令牌
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- -y
+
+# 指定端口 9000 + 自动生成令牌
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- -p 9000 -y
+
+# 指定端口 9000 + 指定令牌（端口、令牌都自己定）
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- -p 9000 -t 我的令牌 -y
+
+# 随机端口 + 自动生成令牌
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --port random -y
+
+# 指定安装某个版本
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- -v v1.2.11 -p 9000 -y
+```
+
+**一行全自动更新**（保留端口/令牌/数据，只换程序并重启）：
+
+```sh
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --update
+```
+
+**一行卸载**：
+
+```sh
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --uninstall
+```
+
+> 没装 `curl`？把上面每条命令的 `curl -fsSL <地址>` 换成 `wget -qO- <地址>` 即可，例如：
+> `wget -qO- https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- -p 9000 -t 我的令牌 -y`
+
+装完后终端会打印**访问地址、API 令牌和常用命令**。打开浏览器访问 `http://你的IP:端口/`，填入令牌即可登录后台。
+
+### 🌐 镜像域名（主用 + 备用）
+
+所有域名路径都一样：`/frp-mgr/install.sh`（即仓库的 `scripts/install.sh`）。哪个快用哪个，不通就换下一个：
+
+| 类型 | 域名 | 完整地址 |
+|---|---|---|
+| **主用** | `gh-raw.966788.xyz` | `https://gh-raw.966788.xyz/frp-mgr/install.sh` |
+| 备用 1 | `gh-raw.s03.qzz.io` | `https://gh-raw.s03.qzz.io/frp-mgr/install.sh` |
+| 备用 2 | `gh-raw.s04.qzz.io` | `https://gh-raw.s04.qzz.io/frp-mgr/install.sh` |
+| 备用 3 | `gh-raw.s05.qzz.io` | `https://gh-raw.s05.qzz.io/frp-mgr/install.sh` |
+| 备用 4 | `gh-raw.s06.qzz.io` | `https://gh-raw.s06.qzz.io/frp-mgr/install.sh` |
+| 备用 5 | `gh-raw.s07.qzz.io` | `https://gh-raw.s07.qzz.io/frp-mgr/install.sh` |
+
+### 🌍 海外服务器（能直连 GitHub）
+
+直接用 GitHub 官方地址即可，用法完全一样：
+
+```sh
+# 交互安装
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)"
+
+# 全自动（带参数）
+curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh | sh -s -- -p 9000 -t 我的令牌 -y
 ```
 
-**使用 wget：**
+### 📋 全部参数说明
+
+| 参数 | 作用 |
+|---|---|
+| `-p, --port <端口>` | 指定监听端口；传 `random` 随机端口；省略则交互/默认 `8080` |
+| `-t, --token <令牌>` | 指定 API 令牌；省略则交互输入，留空自动生成强随机令牌 |
+| `-v, --version <版本>` | 指定版本（如 `v1.2.11`）；省略安装最新版 |
+| `-y, --yes` | 全自动模式，不交互（端口用默认、令牌自动生成） |
+| `-u, --update` | 全自动更新到最新版（保留现有端口/令牌/数据） |
+| `-f, --force` | 配合 `--update`，即使已是最新也强制重装 |
+| `--uninstall` | 卸载 |
+| `-h, --help` | 查看帮助 |
+
+> 参数可任意组合，已传入的项就不再交互询问。也支持环境变量：`FRPMGR_PORT=9000 FRPMGR_API_TOKEN=xxx ASSUME_YES=1`。
+
+### 🔄 全自动更新与定时更新
+
+更新会**保留端口、令牌、配置和数据**，先比对版本，已是最新则跳过（除非加 `--force`）：
 
 ```sh
-sh -c "$(wget -qO- https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)"
+# 一行更新（国内镜像）
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --update
+
+# 更新到指定版本 / 强制重装
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --update -v v1.2.11
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --update --force
 ```
 
-安装过程会**交互式**地问你两件事（直接回车用默认值）：
-
-1. **监听端口**：回车=默认 `8080`，输入 `r`=随机端口，或自己输一个端口号。
-2. **API 令牌**：自己填一个，或直接回车自动生成一个强随机令牌（**请务必保存好，这是登录后台的唯一凭证**）。
-
-装完后终端会打印访问地址、令牌和常用命令。打开浏览器访问 `http://你的IP:端口/` 即可使用。
-
-### 想要不交互 / 自定义参数？
-
-脚本支持命令行参数任意组合，参数已传入的项就不再询问：
+想无人值守自动更新？丢进 `crontab`，例如每天凌晨 4 点：
 
 ```sh
-# 先把脚本下载到本地
-curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh -o install.sh
-
-sh install.sh -p 9000                      # 指定端口 9000，只问令牌
-sh install.sh -t 我的令牌                   # 指定令牌，只问端口
-sh install.sh -p 9000 -t 我的令牌           # 端口+令牌都指定，零交互（仅一次确认）
-sh install.sh -p 9000 -t 我的令牌 -y        # 完全静默安装
-sh install.sh --port random                # 随机端口
-sh install.sh -v v1.2.10 -p 8888           # 指定版本 + 端口
-sh install.sh --help                       # 查看全部参数
+0 4 * * * curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --update >> /var/log/frpmgrd-update.log 2>&1
 ```
-
-也支持用环境变量（适合自动化/CI）：
-
-```sh
-FRPMGR_PORT=9000 FRPMGR_API_TOKEN=xxx ASSUME_YES=1 sh install.sh
-```
-
-### 全自动更新
-
-升级到最新版，**端口、API 令牌、所有配置和数据都原样保留**，只替换程序本体并重启服务。会先比对版本，已是最新就直接跳过（除非加 `--force`）：
-
-```sh
-# 一行命令直接更新（curl）
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)" -- --update
-
-# wget 版
-sh -c "$(wget -qO- https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)" -- --update
-```
-
-如果之前已把脚本下载到本地，直接：
-
-```sh
-sh install.sh --update                 # 更新到最新版（已是最新则跳过）
-sh install.sh --update -v v1.2.11      # 更新/回退到指定版本
-sh install.sh --update --force         # 即使已是最新也强制重装
-```
-
-> 想做无人值守的定时自动更新？把上面的一行命令丢进 `crontab` 即可，例如每天凌晨 4 点：
-> `0 4 * * * sh -c "$(curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)" -- --update >> /var/log/frpmgrd-update.log 2>&1`
 
 ### 卸载
 
 ```sh
-sh install.sh --uninstall
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --uninstall
 ```
 
 会停止并移除系统服务、删除二进制；是否删除配置和数据目录会单独询问你。
