@@ -45,6 +45,8 @@ const tomlEditorFontTheme = EditorView.theme({
 });
 import client, { getAPIToken } from '../api/client';
 import { useTheme } from '../theme/ThemeContext';
+import { useEventSubscription } from '../events/EventStreamContext';
+import type { InstanceStateData } from '../events/types';
 
 const { Title, Text } = Typography;
 
@@ -170,6 +172,50 @@ const Configs: React.FC = () => {
       }
     }, 4000);
     return () => clearInterval(timer);
+  }, []);
+
+  // 事件驱动自动刷新：后端热更新（增删改代理后 reload）、实例启停、代理状态
+  // 变化时实时刷新页面，无需手动刷新或等 4 秒轮询。
+  //
+  // 闭包说明：useEventSubscription 内部用 ref 持有最新回调，回调体里引用的
+  // activeConfigId / loadProxies 始终是最新值，无闭包陷阱。但防抖定时器的
+  // 回调延迟到 300ms 后才执行，那时再用 ref 取「当前是否仍在查看该配置」，
+  // 避免用户已切走却刷错配置。
+  const activeConfigIdRef = useRef(activeConfigId);
+  activeConfigIdRef.current = activeConfigId;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const proxyReloadTimer = useRef<number | null>(null);
+
+  const scheduleProxyReload = (id: string) => {
+    if (proxyReloadTimer.current != null) clearTimeout(proxyReloadTimer.current);
+    proxyReloadTimer.current = window.setTimeout(() => {
+      proxyReloadTimer.current = null;
+      // 仅当用户仍停留在该配置的「代理」Tab 时才重拉，省掉无意义的请求
+      if (activeConfigIdRef.current === id && activeTabRef.current === 'proxies') {
+        loadProxies(id);
+      }
+    }, 300);
+  };
+
+  // 不订阅 proxy.connections：它每 2 秒高频推送，会导致频繁整列表重拉。
+  useEventSubscription(['config.changed', 'proxy.status', 'instance.state'], (e) => {
+    // 实例启停 → 实时更新顶部运行徽标（补足 4 秒轮询的延迟）
+    if (e.type === 'instance.state' && e.config_id) {
+      const st = (e.data as InstanceStateData | undefined)?.state;
+      if (st) {
+        setConfigs(prev => prev.map(c => (c.id === e.config_id ? { ...c, state: st } : c)));
+      }
+    }
+    // 当前正在查看的配置 → 防抖合并连发事件后刷新代理列表（状态列同步更新）
+    if (e.config_id && e.config_id === activeConfigId) {
+      scheduleProxyReload(e.config_id);
+    }
+  });
+
+  // 卸载时清掉挂起的防抖定时器，避免组件已卸载仍触发 loadProxies
+  useEffect(() => () => {
+    if (proxyReloadTimer.current != null) clearTimeout(proxyReloadTimer.current);
   }, []);
 
   const handleStartInstance = async (id: string) => {
@@ -679,8 +725,13 @@ const Configs: React.FC = () => {
   // 根据 values.kind 决定走 envelope 的 `proxy` 还是 `visitor` 通道：
   //   - 'proxy'   → {proxy:   v1.TypedProxyConfig}   全部 8 种协议
   //   - 'visitor' → {visitor: v1.TypedVisitorConfig} 仅 stcp/sudp/xtcp
-  const handleSaveProxy = async (values: any) => {
+  const handleSaveProxy = async (rawValues: any) => {
     try {
+      // 提交前对所有字符串字段统一去除首尾空格（名称、秘钥、地址等），
+      // 避免误输入的空格导致名称冲突、秘钥不匹配或连接失败。
+      const values: any = Object.fromEntries(
+        Object.entries(rawValues).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
+      );
       const splitCSV = (v?: string): string[] | undefined =>
         v ? v.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined;
       const kind = (values.kind as 'proxy' | 'visitor') || 'proxy';

@@ -14,6 +14,7 @@ import (
 
 	"github.com/mia-clark/frp-manager-server/internal/eventbus"
 	"github.com/mia-clark/frp-manager-server/pkg/config"
+	"github.com/mia-clark/frp-manager-server/pkg/consts"
 )
 
 // Options configures the Manager.
@@ -256,8 +257,10 @@ func (m *Manager) Create(id string, data *config.ClientConfig) error {
 }
 
 // Update replaces the config file and live data. If the instance is
-// running it is left running; callers can issue a separate /reload to
-// apply changes.
+// running it is hot-reloaded so proxy add/edit/delete take effect
+// immediately; a stopped instance simply picks up the new file on next
+// start. Reload is best-effort — its failure is logged and surfaced via
+// the instance error event, but does not fail the update itself.
 func (m *Manager) Update(id string, data *config.ClientConfig) error {
 	inst := m.get(id)
 	if inst == nil {
@@ -270,6 +273,11 @@ func (m *Manager) Update(id string, data *config.ClientConfig) error {
 		return err
 	}
 	inst.replaceData(data)
+	if inst.State() == consts.ConfigStateStarted {
+		if err := inst.reload(); err != nil {
+			m.opts.Logger.Warn("auto-reload after update failed", slog.String("id", id), slog.Any("err", err))
+		}
+	}
 	if m.opts.Bus != nil {
 		m.opts.Bus.Publish(eventbus.TypeConfigChanged, id, nil)
 	}
