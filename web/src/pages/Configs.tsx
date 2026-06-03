@@ -1541,7 +1541,8 @@ const Configs: React.FC = () => {
                                         label={<span>登录失败行为 (loginFailExit)</span>}
                                         name="loginFailExit"
                                         valuePropName="checked"
-                                        tooltip="开：首次连接服务端失败直接退出。关：失败后无限重试，适合服务端偶尔重启的场景。"
+                                        initialValue={false}
+                                        tooltip="开：首次连接服务端失败直接退出。关：失败后无限重试，适合服务端偶尔重启的场景。默认关（持续重试）。"
                                       >
                                         <Switch checkedChildren="失败即退出" unCheckedChildren="持续重试" />
                                       </Form.Item>

@@ -59,7 +59,9 @@ func ClientCommonFromV1(c *v1.ClientCommonConfig) (r ClientCommon) {
 	r.ServerPort = c.ServerPort
 	r.NatHoleSTUNServer = c.NatHoleSTUNServer
 	r.DNSServer = c.DNSServer
-	if c.LoginFailExit == nil || *c.LoginFailExit {
+	// 默认 false（登录失败后持续重试）：未设置(nil)或显式 false 一律视为 false，
+	// 仅当用户显式开启 true 时才在登录失败时退出。
+	if c.LoginFailExit != nil && *c.LoginFailExit {
 		r.LoginFailExit = true
 	}
 	r.Start = c.Start
