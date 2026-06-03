@@ -57,7 +57,7 @@ curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- -v v1.2.11 -p
 **一行全自动更新**（保留端口/令牌/数据，只换程序并重启）：
 
 ```sh
-curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --update
+curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --update --force
 ```
 
 **一行卸载**：
