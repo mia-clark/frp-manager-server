@@ -118,6 +118,18 @@ parse_args() {
 # ----------------------------------------------------------------------------
 # 平台探测: OS + ARCH, 并据此决定数据目录
 # ----------------------------------------------------------------------------
+# 探测本机字节序 (mips / mips64 需据此选择大小端二进制); od 缺失时默认小端
+detect_endian() {
+    if command -v od >/dev/null 2>&1 &&
+       [ "$(printf '\1\2\3\4' | od -An -tx4 2>/dev/null | tr -d ' \n')" = "04030201" ]; then
+        echo le
+    elif command -v od >/dev/null 2>&1; then
+        echo be
+    else
+        echo le
+    fi
+}
+
 detect_platform() {
     uname_s="$(uname -s 2>/dev/null || echo unknown)"
     uname_m="$(uname -m 2>/dev/null || echo unknown)"
@@ -125,26 +137,41 @@ detect_platform() {
     case "$uname_s" in
         Linux)   OS="linux" ;;
         Darwin)  OS="darwin" ;;
-        *)       die "不支持的操作系统: $uname_s (仅支持 Linux / macOS)" ;;
+        FreeBSD) OS="freebsd" ;;
+        *)       die "不支持的操作系统: $uname_s (支持 Linux / macOS / FreeBSD)" ;;
     esac
 
     case "$uname_m" in
-        x86_64|amd64)            ARCH="amd64" ;;
-        aarch64|arm64)           ARCH="arm64" ;;
-        armv7l|armv7|armhf|arm)  ARCH="armv7" ;;
-        *)                       die "不支持的 CPU 架构: $uname_m" ;;
+        x86_64|amd64)              ARCH="amd64" ;;
+        aarch64|arm64)             ARCH="arm64" ;;
+        armv7l|armv7|armhf|arm)    ARCH="armv7" ;;
+        armv6l|armv6)              ARCH="armv6" ;;
+        i386|i486|i586|i686|x86)   ARCH="386" ;;
+        riscv64)                   ARCH="riscv64" ;;
+        loongarch64|loong64)       ARCH="loong64" ;;
+        mipsel|mipsle)             ARCH="mipsle" ;;
+        mips64el|mips64le)         ARCH="mips64le" ;;
+        mips)
+            if [ "$(detect_endian)" = "le" ]; then ARCH="mipsle"; else ARCH="mips"; fi ;;
+        mips64)
+            if [ "$(detect_endian)" = "le" ]; then ARCH="mips64le"; else ARCH="mips64"; fi ;;
+        *)                         die "不支持的 CPU 架构: $uname_m" ;;
     esac
 
-    # macOS 没有 armv7 发布产物
-    if [ "$OS" = "darwin" ] && [ "$ARCH" = "armv7" ]; then
-        die "macOS 不提供 armv7 版本"
-    fi
+    # macOS / FreeBSD 仅发布 amd64 与 arm64 版本
+    case "$OS" in
+        darwin|freebsd)
+            case "$ARCH" in
+                amd64|arm64) ;;
+                *) die "${OS} 仅提供 amd64 / arm64 版本 (检测到 ${ARCH})" ;;
+            esac ;;
+    esac
 
-    if [ "$OS" = "darwin" ]; then
-        DATA_DIR="/usr/local/var/${SERVICE_NAME}"
-    else
-        DATA_DIR="/var/lib/${SERVICE_NAME}"
-    fi
+    case "$OS" in
+        darwin)  DATA_DIR="/usr/local/var/${SERVICE_NAME}" ;;
+        freebsd) DATA_DIR="/var/db/${SERVICE_NAME}" ;;
+        *)       DATA_DIR="/var/lib/${SERVICE_NAME}" ;;
+    esac
     ENV_FILE="/etc/${SERVICE_NAME}/${SERVICE_NAME}.env"
 
     info "检测到平台: ${C_BOLD}${OS}/${ARCH}${C_RST}"

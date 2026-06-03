@@ -18,23 +18,30 @@ builds:
       - -s -w
       - -X github.com/mia-clark/frp-manager-server/pkg/version.Number={{.Version}}
       - -X github.com/mia-clark/frp-manager-server/pkg/version.BuildDate={{.Date}}
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-      - arm
-    goarm:
-      - "7"
-    ignore:
-      # macOS does not ship arm32 builds in our matrix
-      - goos: darwin
-        goarch: arm
-      # Windows on arm/v7 is not a real target for frpc
-      - goos: windows
-        goarch: arm
+    # 显式目标清单（对标 frp 官方全平台）。稀疏矩阵用 targets 比 goos×goarch+ignore 清晰。
+    # arm 用 goarm 后缀（v6/v7 两个变体）；mips/mipsle 走 softfloat（软路由多无 FPU），
+    # mips64/mips64le 走 hardfloat；amd64/arm64/386/riscv64 用各自默认微架构（无需后缀）。
+    targets:
+      - linux_amd64
+      - linux_arm64
+      - linux_arm_6
+      - linux_arm_7
+      - linux_386
+      - linux_mips_softfloat
+      - linux_mipsle_softfloat
+      - linux_mips64_hardfloat
+      - linux_mips64le_hardfloat
+      - linux_riscv64
+      - linux_loong64
+      - darwin_amd64
+      - darwin_arm64
+      - windows_amd64
+      - windows_arm64
+      - windows_386
+      - freebsd_amd64
+      - freebsd_arm64
+      # android_arm64 暂不发布：frp 依赖 wlynxg/anet 在 Go 1.25 下 linkname net.zoneCache
+      # 失效（link error），无法构建；termux 等场景可直接使用 linux_arm64 静态二进制。
 
 archives:
   - id: default

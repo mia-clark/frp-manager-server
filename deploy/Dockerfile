@@ -48,9 +48,12 @@ COPY --from=web-build /web/dist ./web/dist
 # 单平台 docker build 默认 linux/amd64
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
+# buildx 对 linux/arm/v7 会注入 TARGETVARIANT=v7；映射为 GOARM（v7→7, v6→6）。
+# 非 arm 目标该值为空，go 自动忽略 GOARM。
+ARG TARGETVARIANT=
 ARG VERSION=dev
 ARG BUILD_DATE=unknown
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=${TARGETVARIANT#v} go build \
     -trimpath \
     -ldflags="-s -w \
       -X github.com/mia-clark/frp-manager-server/pkg/version.Number=${VERSION} \

@@ -155,13 +155,17 @@ function Get-Platform {
         'AMD64' { $script:Arch = 'amd64' }
         'ARM64' { $script:Arch = 'arm64' }
         'x86'   {
-            # 32 位进程也可能跑在 64 位系统上, 以系统位数为准
-            if ([Environment]::Is64BitOperatingSystem) { $script:Arch = 'amd64' }
-            else { Die '不支持 32 位 Windows (仅提供 amd64 / arm64 版本)' }
+            # WOW64：64 位系统上的 32 位进程，以系统真实架构为准；纯 32 位系统用 386
+            if ([Environment]::Is64BitOperatingSystem) {
+                if ($env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { $script:Arch = 'arm64' }
+                else { $script:Arch = 'amd64' }
+            } else {
+                $script:Arch = '386'
+            }
         }
         default {
             if ([Environment]::Is64BitOperatingSystem) { $script:Arch = 'amd64' }
-            else { Die "无法识别的 CPU 架构: $($env:PROCESSOR_ARCHITECTURE)" }
+            else { $script:Arch = '386' }
         }
     }
     Write-Info "检测到平台: windows/$($script:Arch)"
