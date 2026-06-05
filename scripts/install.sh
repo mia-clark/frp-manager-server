@@ -753,6 +753,92 @@ cmd_uninstall() {
     priv rm -f "${INSTALL_DIR}/fmc" 2>/dev/null || true
 }
 
+# 一键迁移: 把旧版 frpmgrd 部署 (服务/数据/配置) 迁到新 frpcmgrd
+#   独立命令, 与 install/update 解耦; 幂等, 无旧部署则直接返回
+cmd_upgrade_legacy() {
+    OLD_SVC="frpmgrd"
+    OLD_BIN="${INSTALL_DIR}/frpmgrd"
+    OLD_ENV="/etc/frpmgrd/frpmgrd.env"
+    OLD_PLIST="/Library/LaunchDaemons/com.miaclark.frpmgrd.plist"
+    case "$(uname -s 2>/dev/null)" in
+        Darwin)  OLD_DATA="/usr/local/var/frpmgrd" ;;
+        FreeBSD) OLD_DATA="/var/db/frpmgrd" ;;
+        *)       OLD_DATA="/var/lib/frpmgrd" ;;
+    esac
+    _init="$(detect_init)"
+
+    # 1. 探测旧部署 (服务/数据/配置/二进制 任一存在即需迁移)
+    _need=0
+    [ -e "$OLD_ENV" ] && _need=1
+    [ -d "$OLD_DATA" ] && _need=1
+    [ -e "$OLD_BIN" ] && _need=1
+    case "$_init" in
+        systemd) [ -f "/etc/systemd/system/${OLD_SVC}.service" ] && _need=1 ;;
+        openrc)  [ -f "/etc/init.d/${OLD_SVC}" ] && _need=1 ;;
+        launchd) [ -f "$OLD_PLIST" ] && _need=1 ;;
+    esac
+    if [ "$_need" -eq 0 ]; then
+        ok "未检测到旧版 frpmgrd 部署, 无需迁移"
+        exit 0
+    fi
+
+    info "检测到旧版 frpmgrd, 开始迁移到 frpcmgrd ..."
+
+    # 2. 停两侧服务 (新服务避免占用数据目录; 旧服务停并禁用)
+    case "$_init" in
+        systemd)
+            priv systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+            priv systemctl stop "$OLD_SVC" 2>/dev/null || true
+            priv systemctl disable "$OLD_SVC" 2>/dev/null || true ;;
+        openrc)
+            priv rc-service "$SERVICE_NAME" stop 2>/dev/null || true
+            priv rc-service "$OLD_SVC" stop 2>/dev/null || true
+            priv rc-update del "$OLD_SVC" default 2>/dev/null || true ;;
+        launchd)
+            priv launchctl unload "$PLIST" 2>/dev/null || true
+            priv launchctl unload -w "$OLD_PLIST" 2>/dev/null || true ;;
+    esac
+
+    # 3. 迁移数据目录 (仅当新目录没有真实隧道配置时才迁, 绝不覆盖)
+    if [ -d "$OLD_DATA" ]; then
+        if ls "$DATA_DIR"/profiles/*.toml >/dev/null 2>&1; then
+            warn "新数据目录已有隧道配置, 跳过数据迁移 (旧数据保留在 $OLD_DATA)"
+        else
+            priv rm -rf "$DATA_DIR" 2>/dev/null || true
+            priv mkdir -p "$(dirname "$DATA_DIR")"
+            priv mv "$OLD_DATA" "$DATA_DIR"
+            ok "数据目录已迁移: $OLD_DATA -> $DATA_DIR"
+        fi
+    fi
+
+    # 4. 迁移配置 (前缀 FRPMGR_ -> FRPCMGR_, 并把 DATA_DIR 指向新路径)
+    if [ -f "$OLD_ENV" ]; then
+        if [ -f "$ENV_FILE" ]; then
+            warn "新配置已存在, 跳过配置迁移 (旧配置保留在 $OLD_ENV)"
+        else
+            priv mkdir -p "$(dirname "$ENV_FILE")"
+            sed -e 's/^FRPMGR_/FRPCMGR_/' \
+                -e "s#^FRPCMGR_DATA_DIR=.*#FRPCMGR_DATA_DIR=${DATA_DIR}#" \
+                "$OLD_ENV" | priv tee "$ENV_FILE" >/dev/null
+            ok "配置已迁移: $OLD_ENV -> $ENV_FILE (前缀 FRPMGR_ -> FRPCMGR_)"
+        fi
+    fi
+
+    # 5. 清理旧服务单元与二进制
+    case "$_init" in
+        systemd) priv rm -f "/etc/systemd/system/${OLD_SVC}.service"; priv systemctl daemon-reload 2>/dev/null || true ;;
+        openrc)  priv rm -f "/etc/init.d/${OLD_SVC}" ;;
+        launchd) priv rm -f "$OLD_PLIST" ;;
+    esac
+    priv rm -f "$OLD_BIN" 2>/dev/null || true
+    priv rmdir "/etc/frpmgrd" 2>/dev/null || true
+    ok "旧服务与二进制已清理"
+
+    # 6. 启动新服务并展示信息
+    cmd_start || warn "新服务启动失败, 请手动执行 fmc start 检查"
+    ok "迁移完成 ✅ 当前运行的是 frpcmgrd"
+}
+
 usage() {
     printf "%b\n" "${C_BOLD}fmc — frpcmgrd 管理命令${C_RST}
 
@@ -776,6 +862,7 @@ usage() {
   install [参数]   重新安装 (参数透传给 install.sh)
   update [参数]    更新到最新版 (保留端口/令牌/数据)
   uninstall        卸载
+  upgrade-legacy   迁移旧版 frpmgrd 部署到 frpcmgrd (服务/数据/配置)
 
   help             显示本帮助"
 }
@@ -801,6 +888,7 @@ case "${1:-help}" in
     update)     shift; cmd_update "$@" ;;
     install)    shift; cmd_install "$@" ;;
     uninstall)  shift; cmd_uninstall "$@"; exit 0 ;;
+    upgrade-legacy|upgrade_legacy) shift; cmd_upgrade_legacy "$@"; exit 0 ;;
     help|-h|--help) usage; exit 0 ;;
     *)          err "未知命令: ${1}"; echo; usage; exit 2 ;;
 esac

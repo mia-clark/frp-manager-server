@@ -521,6 +521,75 @@ function Do-Config {
     else { & $NssmPath get $ServiceName AppEnvironmentExtra }
 }
 function Do-Version { & $BinPath version }
+function Do-UpgradeLegacy {
+    Need-Admin
+    $oldSvc     = 'frpmgrd'
+    $oldData    = Join-Path $env:ProgramData 'frpmgrd\data'
+    $oldLogs    = Join-Path $env:ProgramData 'frpmgrd\logs'
+    $oldInstall = Join-Path $env:ProgramFiles 'frpmgrd'
+    $oldNssm    = Join-Path $oldInstall 'nssm.exe'
+
+    $oldSvcObj = Get-Service -Name $oldSvc -ErrorAction SilentlyContinue
+    if (-not ($oldSvcObj -or (Test-Path $oldData) -or (Test-Path $oldInstall))) {
+        Write-Host '[+] 未检测到旧版 frpmgrd 部署, 无需迁移' -ForegroundColor Green
+        exit 0
+    }
+    Write-Host '[*] 检测到旧版 frpmgrd, 开始迁移到 frpcmgrd ...' -ForegroundColor Blue
+
+    # 1. 删除旧服务前, 先读出旧环境变量 (FRPMGR_*)
+    $oldEnv = @()
+    if (Test-Path $oldNssm) { $oldEnv = @(& $oldNssm get $oldSvc AppEnvironmentExtra 2>$null) }
+
+    # 2. 停新服务 + 停删旧服务
+    if (Use-Nssm) { & $NssmPath stop $ServiceName 2>$null | Out-Null }
+    if ($oldSvcObj) {
+        if (Test-Path $oldNssm) {
+            & $oldNssm stop   $oldSvc         2>$null | Out-Null
+            & $oldNssm remove $oldSvc confirm 2>$null | Out-Null
+        } else {
+            & sc.exe stop   $oldSvc 2>$null | Out-Null
+            & sc.exe delete $oldSvc 2>$null | Out-Null
+        }
+        Write-Host '[+] 旧服务 frpmgrd 已停止并移除' -ForegroundColor Green
+    }
+
+    # 3. 迁移数据目录 (新目录无隧道配置时才迁, 绝不覆盖)
+    if (Test-Path $oldData) {
+        $newProfiles = Join-Path $DataDir 'profiles'
+        $hasNew = (Test-Path $newProfiles) -and (Get-ChildItem -Path $newProfiles -Filter *.toml -ErrorAction SilentlyContinue)
+        if ($hasNew) {
+            Write-Host "[!] 新数据目录已有隧道配置, 跳过数据迁移 (旧数据保留在 $oldData)" -ForegroundColor Yellow
+        } else {
+            if (Test-Path $DataDir) { Remove-Item -Recurse -Force $DataDir -ErrorAction SilentlyContinue }
+            New-Item -ItemType Directory -Force -Path (Split-Path $DataDir -Parent) | Out-Null
+            Move-Item -Force $oldData $DataDir
+            Write-Host "[+] 数据目录已迁移: $oldData -> $DataDir" -ForegroundColor Green
+        }
+    }
+
+    # 4. 把旧环境变量 (FRPMGR_*) 以 FRPCMGR_ 前缀重设到新服务, DATA_DIR 指向新路径
+    if ($oldEnv.Count -gt 0 -and (Use-Nssm)) {
+        $newEnv = foreach ($line in $oldEnv) {
+            if ($line -match '^\s*FRPMGR_(.+)$') {
+                $kv = $Matches[1]
+                if ($kv -match '^DATA_DIR=') { "FRPCMGR_DATA_DIR=$DataDir" } else { "FRPCMGR_$kv" }
+            }
+        }
+        $newEnv = @($newEnv | Where-Object { $_ })
+        if ($newEnv.Count -gt 0) {
+            & $NssmPath set $ServiceName AppEnvironmentExtra $newEnv | Out-Null
+            Write-Host '[+] 配置已迁移到新服务 (前缀 FRPMGR_ -> FRPCMGR_)' -ForegroundColor Green
+        }
+    }
+
+    # 5. 清理旧二进制目录与日志
+    if (Test-Path $oldInstall) { Remove-Item -Recurse -Force $oldInstall -ErrorAction SilentlyContinue }
+    if ((Test-Path $oldLogs) -and -not (Test-Path $LogDir)) { Move-Item -Force $oldLogs $LogDir }
+
+    # 6. 启动新服务
+    if (Use-Nssm) { & $NssmPath start $ServiceName 2>$null | Out-Null } else { & sc.exe start $ServiceName 2>$null | Out-Null }
+    Write-Host '[+] 迁移完成, 当前运行的是 frpcmgrd' -ForegroundColor Green
+}
 function Invoke-Installer([object[]]$extra) {
     Need-Admin
     $tmp = Join-Path $env:TEMP ("frpmgr_install_" + [Guid]::NewGuid().ToString('N') + ".ps1")
@@ -552,6 +621,7 @@ fmc — frpcmgrd 管理命令
   install [参数]   重新安装 (参数透传给 install.ps1)
   update [参数]    更新到最新版 (保留端口/令牌/数据)
   uninstall        卸载
+  upgrade-legacy   迁移旧版 frpmgrd 部署到 frpcmgrd (服务/数据/配置)
 
   help             显示本帮助
 "@
@@ -581,6 +651,8 @@ switch ($Cmd.ToLower()) {
         Remove-Item -Force (Join-Path $InstallDir 'fmc.cmd'), (Join-Path $InstallDir 'fmc.ps1') -ErrorAction SilentlyContinue
         exit 0
     }
+    'upgrade-legacy' { Do-UpgradeLegacy; exit 0 }
+    'upgrade_legacy' { Do-UpgradeLegacy; exit 0 }
     default {
         Show-Usage
         if ($Cmd.ToLower() -in @('help', '-h', '--help', '-help')) { exit 0 } else { exit 2 }
