@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/mia-clark/frp-manager-server/pkg/config"
+	"github.com/mia-clark/frpc-manager/pkg/config"
 )
 
 // toV1 converts an in-memory ClientConfig into the JSON-friendly V1

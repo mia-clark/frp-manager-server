@@ -56,8 +56,8 @@ ARG BUILD_DATE=unknown
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=${TARGETVARIANT#v} go build \
     -trimpath \
     -ldflags="-s -w \
-      -X github.com/mia-clark/frp-manager-server/pkg/version.Number=${VERSION} \
-      -X github.com/mia-clark/frp-manager-server/pkg/version.BuildDate=${BUILD_DATE}" \
+      -X github.com/mia-clark/frpc-manager/pkg/version.Number=${VERSION} \
+      -X github.com/mia-clark/frpc-manager/pkg/version.BuildDate=${BUILD_DATE}" \
     -o /out/frpmgrd ./cmd/frpmgrd
 
 # ----- runtime stage ----------------------------------------------------

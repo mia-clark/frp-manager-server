@@ -1,4 +1,4 @@
-module github.com/mia-clark/frp-manager-server
+module github.com/mia-clark/frpc-manager
 
 go 1.25.0
 

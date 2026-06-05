@@ -16,7 +16,7 @@ import (
 	"github.com/fatedier/frp/pkg/util/log"
 	glog "github.com/fatedier/golib/log"
 
-	"github.com/mia-clark/frp-manager-server/pkg/consts"
+	"github.com/mia-clark/frpc-manager/pkg/consts"
 )
 
 type FrpClientService struct {

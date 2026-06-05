@@ -12,9 +12,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/mia-clark/frp-manager-server/internal/eventbus"
-	"github.com/mia-clark/frp-manager-server/pkg/config"
-	"github.com/mia-clark/frp-manager-server/pkg/consts"
+	"github.com/mia-clark/frpc-manager/internal/eventbus"
+	"github.com/mia-clark/frpc-manager/pkg/config"
+	"github.com/mia-clark/frpc-manager/pkg/consts"
 )
 
 // Options configures the Manager.

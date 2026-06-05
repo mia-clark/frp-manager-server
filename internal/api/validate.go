@@ -8,7 +8,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/mia-clark/frp-manager-server/pkg/config"
+	"github.com/mia-clark/frpc-manager/pkg/config"
 )
 
 // ValidateHandler serves POST /api/v1/validate. It accepts either JSON

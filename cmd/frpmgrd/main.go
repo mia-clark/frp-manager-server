@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mia-clark/frp-manager-server/internal/api"
-	"github.com/mia-clark/frp-manager-server/internal/appcfg"
-	"github.com/mia-clark/frp-manager-server/internal/eventbus"
-	"github.com/mia-clark/frp-manager-server/internal/manager"
-	"github.com/mia-clark/frp-manager-server/pkg/version"
+	"github.com/mia-clark/frpc-manager/internal/api"
+	"github.com/mia-clark/frpc-manager/internal/appcfg"
+	"github.com/mia-clark/frpc-manager/internal/eventbus"
+	"github.com/mia-clark/frpc-manager/internal/manager"
+	"github.com/mia-clark/frpc-manager/pkg/version"
 )
 
 func main() {

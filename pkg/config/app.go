@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/mia-clark/frp-manager-server/pkg/consts"
+	"github.com/mia-clark/frpc-manager/pkg/consts"
 )
 
 const (

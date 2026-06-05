@@ -6,8 +6,8 @@ import (
 
 	"gopkg.in/ini.v1"
 
-	"github.com/mia-clark/frp-manager-server/pkg/consts"
-	"github.com/mia-clark/frp-manager-server/pkg/util"
+	"github.com/mia-clark/frpc-manager/pkg/consts"
+	"github.com/mia-clark/frpc-manager/pkg/util"
 )
 
 func init() {

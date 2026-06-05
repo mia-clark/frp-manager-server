@@ -12,12 +12,12 @@ import (
 
 	"github.com/fatedier/frp/client/proxy"
 
-	"github.com/mia-clark/frp-manager-server/internal/conntrack"
-	"github.com/mia-clark/frp-manager-server/internal/eventbus"
-	"github.com/mia-clark/frp-manager-server/pkg/config"
-	"github.com/mia-clark/frp-manager-server/pkg/consts"
-	"github.com/mia-clark/frp-manager-server/pkg/util"
-	"github.com/mia-clark/frp-manager-server/services"
+	"github.com/mia-clark/frpc-manager/internal/conntrack"
+	"github.com/mia-clark/frpc-manager/internal/eventbus"
+	"github.com/mia-clark/frpc-manager/pkg/config"
+	"github.com/mia-clark/frpc-manager/pkg/consts"
+	"github.com/mia-clark/frpc-manager/pkg/util"
+	"github.com/mia-clark/frpc-manager/services"
 )
 
 // instance owns a single frpc client lifecycle. The Manager holds these
