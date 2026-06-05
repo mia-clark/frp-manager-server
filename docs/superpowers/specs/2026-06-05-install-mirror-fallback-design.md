@@ -12,20 +12,23 @@
 **目标**：内置一份按优先级排好的 GitHub release 代理候选数组，安装/升级时挨个试，第一个能成功**下载并解开**的就采用；
 全部代理失败再回落直连，直连也挂才报错。两端（sh + ps1）行为对称。
 
-## 2. 候选代理（按 2026-06-05 实测速度排序）
+## 2. 候选代理（用户指定顺序：公开 4 家在前，自建 6 家在后）
+
+> 用户决策：公开代理放前面优先消耗，自建放后面作为保底（保护自建服务器带宽）。
+> 实测速度仅作参考，不决定顺序。
 
 | 优先级 | 代理 | 实测速度 (7.3 MB) | 来源 |
 |:-:|---|---|---|
-| 1 | `https://docker.srv1.qzz.io/` | 0.613s | 用户自建 |
-| 2 | `https://dk-proxy.srv1.qzz.io/` | 0.616s | 用户自建 |
-| 3 | `https://dk-proxy.966788.xyz/` | 0.619s | 用户自建 |
-| 4 | `https://dk-proxy.srv0.qzz.io/` | 0.620s | 用户自建 |
-| 5 | `https://docker.srv0.qzz.io/` | 1.379s | 用户自建 |
-| 6 | `https://docker.966788.xyz/` | 1.440s | 用户自建 |
-| 7 | `https://gh-proxy.com/` | 1.43s | 公开兼胎 |
-| 8 | `https://ghfast.top/` | 1.93s | 公开兼胎 |
-| 9 | `https://github.tbedu.top/` | 2.66s | 公开兼胎 |
-| 10 | `https://gh.idayer.com/` | 2.76s | 公开兼胎 |
+| 1 | `https://gh-proxy.com/` | 1.43s | 公开 |
+| 2 | `https://ghfast.top/` | 1.93s | 公开 |
+| 3 | `https://github.tbedu.top/` | 2.66s | 公开 |
+| 4 | `https://gh.idayer.com/` | 2.76s | 公开 |
+| 5 | `https://docker.srv1.qzz.io/` | 0.613s | 用户自建 |
+| 6 | `https://dk-proxy.srv1.qzz.io/` | 0.616s | 用户自建 |
+| 7 | `https://dk-proxy.966788.xyz/` | 0.619s | 用户自建 |
+| 8 | `https://dk-proxy.srv0.qzz.io/` | 0.620s | 用户自建 |
+| 9 | `https://docker.srv0.qzz.io/` | 1.379s | 用户自建 |
+| 10 | `https://docker.966788.xyz/` | 1.440s | 用户自建 |
 
 **URL 拼装格式**（统一）：`${PROXY}https://github.com/USER/REPO/releases/download/...`
 （即把完整 GitHub URL 当作 path 拼到代理域名后；moeyy 风格 `/https/...` 不支持。）
