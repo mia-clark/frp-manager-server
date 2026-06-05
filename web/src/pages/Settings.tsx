@@ -35,7 +35,7 @@ interface VersionResp {
   build_date?: string;
 }
 
-const APP_REPO = 'https://github.com/mia-clark/frp-manager-server';
+const APP_REPO = 'https://github.com/mia-clark/frpc-manager';
 
 const Settings: React.FC = () => {
   const { token } = antdTheme.useToken();

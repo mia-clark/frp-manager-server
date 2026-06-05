@@ -1,14 +1,14 @@
 #!/bin/sh
 # =============================================================================
-# frpmgrd 一键安装脚本 (frp-manager-server)
+# frpmgrd 一键安装脚本 (frpc-manager)
 #
 #   支持: macOS / 各类 Linux (systemd / OpenRC / 通用回退)
 #   下载: 自动选择 curl 或 wget
 #   功能: 自动识别系统架构 -> 下载对应二进制 -> 安装 -> 注册系统服务 -> 开机自启
 #
 # 一行安装 (推荐, 支持交互):
-#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)"
-#   sh -c "$(wget -qO- https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)"
+#   sh -c "$(curl -fsSL https://raw.githubusercontent.com/mia-clark/frpc-manager/main/scripts/install.sh)"
+#   sh -c "$(wget -qO- https://raw.githubusercontent.com/mia-clark/frpc-manager/main/scripts/install.sh)"
 #
 # 非交互 / 自定义示例:
 #   sh install.sh --yes --port 9000 --token mysecret
@@ -24,7 +24,7 @@ set -eu
 # ----------------------------------------------------------------------------
 # 常量配置
 # ----------------------------------------------------------------------------
-REPO="mia-clark/frp-manager-server"
+REPO="mia-clark/frpc-manager"
 BIN_NAME="frpmgrd"
 INSTALL_DIR="/usr/local/bin"
 SERVICE_NAME="frpmgrd"

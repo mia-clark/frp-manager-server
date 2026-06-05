@@ -91,13 +91,13 @@ release:
   mode: replace
   github:
     owner: mia-clark
-    name: frp-manager-server
+    name: frpc-manager
   header: |
     ## frpmgrd {{ .Tag }}
 
-    Built from [`{{ .ShortCommit }}`](https://github.com/mia-clark/frp-manager-server/commit/{{ .FullCommit }}).
+    Built from [`{{ .ShortCommit }}`](https://github.com/mia-clark/frpc-manager/commit/{{ .FullCommit }}).
   footer: |
     ---
 
-    Container image: `ghcr.io/mia-clark/frp-manager-server:{{ .Version }}`
-    See [`docs/README-server.md`](https://github.com/mia-clark/frp-manager-server/blob/main/docs/README-server.md) for deployment.
+    Container image: `ghcr.io/mia-clark/frpc-manager:{{ .Version }}`
+    See [`docs/README-server.md`](https://github.com/mia-clark/frpc-manager/blob/main/docs/README-server.md) for deployment.

@@ -5,7 +5,7 @@
 
 简单说：你不用再手动写一堆 `frpc.toml`、再用 `systemctl` 一个个管理了。装上它，打开网页，点点鼠标就能新增/启动/停止/查看日志/监控你的所有穿透隧道。
 
-> 本项目从 Windows 桌面版 [frpmgr](https://github.com/mia-clark/frp-manager-server) 演化而来，去掉了 Windows GUI，保留了配置模型、热重载和内嵌 frpc 的能力，改造成 Linux/服务器友好的服务。内置 frp `v0.69.1`。
+> 本项目从 Windows 桌面版 [frpmgr](https://github.com/mia-clark/frpc-manager) 演化而来，去掉了 Windows GUI，保留了配置模型、热重载和内嵌 frpc 的能力，改造成 Linux/服务器友好的服务。内置 frp `v0.69.1`。
 
 ---
 
@@ -90,10 +90,10 @@ curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --uninstall
 
 ```sh
 # 交互安装
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh)"
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/mia-clark/frpc-manager/main/scripts/install.sh)"
 
 # 全自动（带参数）
-curl -fsSL https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.sh | sh -s -- -p 9000 -t 我的令牌 -y
+curl -fsSL https://raw.githubusercontent.com/mia-clark/frpc-manager/main/scripts/install.sh | sh -s -- -p 9000 -t 我的令牌 -y
 ```
 
 ### 📋 全部参数说明
@@ -147,7 +147,7 @@ curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --uninstall
 | macOS | launchd | ✅ |
 | 其它（无 systemd/OpenRC） | 打印手动后台运行命令 | 需手动 |
 
-> CPU 架构自动识别：`amd64` / `arm64` / `armv7`（树莓派等）。Windows 用户请用下面的 Docker 方式，或到 [Releases](https://github.com/mia-clark/frp-manager-server/releases) 下载 Windows 版手动运行。
+> CPU 架构自动识别：`amd64` / `arm64` / `armv7`（树莓派等）。Windows 用户请用下面的 Docker 方式，或到 [Releases](https://github.com/mia-clark/frpc-manager/releases) 下载 Windows 版手动运行。
 
 ---
 
@@ -159,7 +159,7 @@ curl -fsSL https://gh-raw.966788.xyz/frp-mgr/install.sh | sh -s -- --uninstall
 docker run -d --name frpmgrd --network host \
   -e FRPMGR_API_TOKEN="$(openssl rand -hex 32)" \
   -v $(pwd)/data:/data \
-  ghcr.io/mia-clark/frp-manager-server:latest
+  ghcr.io/mia-clark/frpc-manager:latest
 ```
 
 镜像在每次推送到 `main` 和每个发布标签时自动构建（支持 amd64 + arm64）。
@@ -169,8 +169,8 @@ docker run -d --name frpmgrd --network host \
 在任意空目录里：
 
 ```bash
-curl -O https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/deploy/docker-compose.standalone.yml
-curl -O https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/deploy/.env.example
+curl -O https://raw.githubusercontent.com/mia-clark/frpc-manager/main/deploy/docker-compose.standalone.yml
+curl -O https://raw.githubusercontent.com/mia-clark/frpc-manager/main/deploy/.env.example
 mv .env.example .env
 # 编辑 .env，至少把 FRPMGR_API_TOKEN 设成一个真实令牌
 docker compose -f docker-compose.standalone.yml up -d
@@ -178,7 +178,7 @@ docker compose -f docker-compose.standalone.yml up -d
 
 ### 方式三：手动下载二进制
 
-到 [Releases](https://github.com/mia-clark/frp-manager-server/releases) 下载对应平台的压缩包（Linux amd64/arm64/armv7、macOS amd64/arm64、Windows amd64/arm64），解压后：
+到 [Releases](https://github.com/mia-clark/frpc-manager/releases) 下载对应平台的压缩包（Linux amd64/arm64/armv7、macOS amd64/arm64、Windows amd64/arm64），解压后：
 
 ```bash
 FRPMGR_API_TOKEN=$(openssl rand -hex 32) ./frpmgrd serve

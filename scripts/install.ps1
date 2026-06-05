@@ -1,13 +1,13 @@
 ﻿#Requires -Version 5.1
 # =============================================================================
-# frpmgrd 一键安装脚本 (frp-manager-server) — Windows / PowerShell 版
+# frpmgrd 一键安装脚本 (frpc-manager) — Windows / PowerShell 版
 #
 #   支持: Windows 10/11 / Windows Server (amd64 / arm64)
 #   服务: 通过 NSSM 将 frpmgrd.exe 包装为真正的 Windows 服务 (可在 services.msc 管理)
 #   功能: 自动识别架构 -> 下载二进制 -> 安装 -> 注册服务 -> 开机自启 -> 健康检查
 #
 # 一行安装 (推荐, 管理员 PowerShell 中执行):
-#   irm https://raw.githubusercontent.com/mia-clark/frp-manager-server/main/scripts/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/mia-clark/frpc-manager/main/scripts/install.ps1 | iex
 #
 # 非交互 / 自定义示例 (先把脚本下到本地):
 #   powershell -ExecutionPolicy Bypass -File install.ps1 -Yes -Port 9000 -Token mysecret
@@ -35,7 +35,7 @@ $ErrorActionPreference = 'Stop'
 # ----------------------------------------------------------------------------
 # 常量配置
 # ----------------------------------------------------------------------------
-$Repo         = 'mia-clark/frp-manager-server'
+$Repo         = 'mia-clark/frpc-manager'
 $BinName      = 'frpmgrd.exe'
 $ServiceName  = 'frpmgrd'
 $DisplayName  = 'frpmgrd - FRP Manager Server'
