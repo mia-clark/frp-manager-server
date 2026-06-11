@@ -1,53 +1,34 @@
 #!/bin/sh
 # =============================================================================
-# nfpm postinstall — 装包后：联网拉取本机架构的二进制 -> 启用并启动服务
-#   opkg/apk 安装时执行 (镜像构建阶段 $IPKG_INSTROOT 非空，跳过)。
-#   本包是 all 架构：不含二进制，由 frpcmgrd-fetch 按 CPU 自动下载对应版本。
+# nfpm postinstall — 只装 web 壳子，不自动下载二进制。
+#   核心二进制由 LuCI 网页（服务 → FRPC Manager → 下载核心）或命令行
+#   frpcmgrd-fetch 触发下载。opkg/apk 安装时执行（镜像构建期 $IPKG_INSTROOT 非空跳过）。
 # =============================================================================
 [ -n "${IPKG_INSTROOT}" ] && exit 0
 
-_fetched=0
-if [ -x /usr/sbin/frpcmgrd-fetch ]; then
-	if /usr/sbin/frpcmgrd-fetch; then
-		_fetched=1
-	fi
-fi
+# 启用服务（开机自启）；二进制下载安装后才能真正启动
+[ -x /etc/init.d/frpcmgrd ] && /etc/init.d/frpcmgrd enable >/dev/null 2>&1
 
-# 启停细节由 init 脚本写入 logd；这里只判定结果，且不因失败 exit 非 0
-# （避免把包标记为 config-failed 留下半安装状态）。
-_started=0
-if [ "$_fetched" = "1" ] && [ -x /etc/init.d/frpcmgrd ]; then
-	/etc/init.d/frpcmgrd enable >/dev/null 2>&1
-	/etc/init.d/frpcmgrd start  >/dev/null 2>&1 && _started=1
-fi
+# 立即刷新 LuCI 菜单/模块缓存并重载 rpcd，让 FRPC Manager 菜单与 ACL 立即出现
+# （opkg 场景；apk 场景由 /etc/uci-defaults/40_luci-frpcmgr 在下次启动兜底）
+rm -f  /tmp/luci-indexcache* 2>/dev/null
+rm -rf /tmp/luci-modulecache 2>/dev/null
+/etc/init.d/rpcd reload >/dev/null 2>&1
 
-_token="$(uci -q get frpcmgrd.main.token 2>/dev/null)"
 _addr="$(uci -q get frpcmgrd.main.http_addr 2>/dev/null)"
 [ -n "$_addr" ] || _addr=":8080"
 
 echo ""
 echo "==================================================================="
-if [ "$_started" = "1" ]; then
-	echo " frpcmgrd 已安装并启动 ✓"
-elif [ "$_fetched" = "1" ]; then
-	echo " frpcmgrd 二进制已下载，但服务未能启动 ✗"
-	echo "   排查: logread -e frpcmgrd   修好后: /etc/init.d/frpcmgrd start"
-else
-	echo " frpcmgrd 壳子已安装，但二进制下载失败（可能无网络）✗"
-	echo "   联网后执行: frpcmgrd-fetch   再: /etc/init.d/frpcmgrd start"
-fi
+echo " luci-app-frpcmgr 已安装 ✓（web 壳子）"
 echo "-------------------------------------------------------------------"
-echo " 访问后台 : http://<路由器IP>${_addr}"
-echo " API 令牌 : ${_token:-（启动后用 uci get frpcmgrd.main.token 查看）}"
+echo " 打开路由器后台 → 服务(Services) → FRPC Manager："
+echo "   ① 下载 / 更新核心二进制"
+echo "   ② 配置端口 / 登录令牌"
+echo "   ③ 启动服务，再点「打开管理后台」管理隧道"
 echo ""
-echo " 改端口/令牌:"
-echo "   uci set frpcmgrd.main.http_addr=':9000'"
-echo "   uci set frpcmgrd.main.token='你的强随机令牌'"
-echo "   uci commit frpcmgrd && /etc/init.d/frpcmgrd restart"
-echo ""
-echo " 服务管理: /etc/init.d/frpcmgrd {start|stop|restart|enable|disable}"
-echo " 实时日志: logread -e frpcmgrd -f"
-echo " 升级    : 联网执行 frpcmgrd-fetch <新版本>，或重装新版 all ipk"
+echo " 也可命令行下载核心: frpcmgrd-fetch latest"
+echo " frpcmgrd 自带后台: http://<路由器IP>${_addr}"
 echo "==================================================================="
 echo ""
 

@@ -68,7 +68,13 @@ FETCH_SRC="$ROOT_DIR/openwrt/files/usr/sbin/frpcmgrd-fetch"
 POSTINST="$ROOT_DIR/openwrt/scripts/postinst.sh"
 PRERM="$ROOT_DIR/openwrt/scripts/prerm.sh"
 POSTRM="$ROOT_DIR/openwrt/scripts/postrm.sh"
-for f in "$INITD_SRC" "$CONFIG_SRC" "$FETCH_SRC" "$POSTINST" "$PRERM" "$POSTRM" "$NFPM_CONF"; do
+# LuCI web 壳子
+LUA_CTRL="$ROOT_DIR/openwrt/luci-app-frpcmgr/luasrc/controller/frpcmgr.lua"
+LUA_VIEW="$ROOT_DIR/openwrt/luci-app-frpcmgr/luasrc/view/frpcmgr/main.htm"
+ACL_LUCI="$ROOT_DIR/openwrt/luci-app-frpcmgr/root/usr/share/rpcd/acl.d/luci-app-frpcmgr.json"
+UCIDEF_LUCI="$ROOT_DIR/openwrt/luci-app-frpcmgr/root/etc/uci-defaults/40_luci-frpcmgr"
+for f in "$INITD_SRC" "$CONFIG_SRC" "$FETCH_SRC" "$POSTINST" "$PRERM" "$POSTRM" \
+         "$LUA_CTRL" "$LUA_VIEW" "$ACL_LUCI" "$UCIDEF_LUCI" "$NFPM_CONF"; do
 	[ -f "$f" ] || die "缺少随包文件: $f"
 done
 
@@ -92,6 +98,10 @@ sed -e "s|__PKG_VERSION__|$(sed_escape "$VERSION")|g" \
     -e "s|__POSTINST__|$(sed_escape "$(to_native "$POSTINST")")|g" \
     -e "s|__PRERM__|$(sed_escape "$(to_native "$PRERM")")|g" \
     -e "s|__POSTRM__|$(sed_escape "$(to_native "$POSTRM")")|g" \
+    -e "s|__LUA_CTRL__|$(sed_escape "$(to_native "$LUA_CTRL")")|g" \
+    -e "s|__LUA_VIEW__|$(sed_escape "$(to_native "$LUA_VIEW")")|g" \
+    -e "s|__ACL_LUCI__|$(sed_escape "$(to_native "$ACL_LUCI")")|g" \
+    -e "s|__UCIDEF_LUCI__|$(sed_escape "$(to_native "$UCIDEF_LUCI")")|g" \
     "$NFPM_CONF" > "$YAML"
 
 OUTFILE="$OUT/frpcmgrd_${VERSION}-${PKG_RELEASE}_all.ipk"

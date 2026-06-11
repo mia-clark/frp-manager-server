@@ -241,7 +241,7 @@ FRPCMGR_API_TOKEN=$(openssl rand -hex 32) ./frpcmgrd serve
 opkg install frpcmgrd_<版本>-1_all.ipk
 ```
 
-装后自动识别本机 CPU、联网拉对应二进制（**优先走自建源**，公共代理 + GitHub 直连兜底）、由 **procd** 守护、配置走 **UCI**（`uci set frpcmgrd.main.token=...`），自动启停与开机自启。改端口/令牌后 `uci commit frpcmgrd && /etc/init.d/frpcmgrd restart`。升级：`frpcmgrd-fetch latest` 或重装新版 all ipk。
+装的是 **LuCI web 壳子**，全程网页操作：打开 **LuCI → 服务 → FRPC Manager** → 点「下载/更新核心」（自动识别 CPU、**优先走自建源**，公共代理 + GitHub 直连兜底）→ 填端口/登录令牌 → 启动 → 点「打开管理后台」进 frpcmgrd 自带界面管隧道。由 **procd** 守护、配置走 **UCI**。也可纯命令行：`frpcmgrd-fetch latest`。
 
 > ⚠️ 二进制约 20–26MB，**仅适合 x86 软路由 / 大 NAND 机型 / extroot 外置存储设备**，8/16MB flash 小路由装不下（装时会预检空间并提示）。安装时需能联网拉二进制。OpenWrt 25.12+（默认 apk）暂不直接支持。详见 [openwrt/README.md](openwrt/README.md)。
 

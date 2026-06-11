@@ -9,6 +9,10 @@
 # =============================================================================
 [ -n "${IPKG_INSTROOT}" ] && exit 0
 
+# 刷新 LuCI 菜单缓存（升级/卸载都做）
+rm -f  /tmp/luci-indexcache* 2>/dev/null
+rm -rf /tmp/luci-modulecache 2>/dev/null
+
 # 升级场景：新包 fetcher 仍在 -> 不删二进制
 [ -x /usr/sbin/frpcmgrd-fetch ] && exit 0
 

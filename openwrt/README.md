@@ -11,25 +11,28 @@
 `frpcmgrd` 是按 CPU 编译的 Go 二进制，本来需要每个架构一个包。本方案用**「壳子包 + 安装时自取二进制」**把它收敛成一个 `all` 包：
 
 ```
-all ipk（仅 ~8KB，不含二进制）
+all ipk（仅 ~15KB，不含二进制）
+├── LuCI web 壳子（控制器 + 视图 + ACL + uci-defaults）  ← 网页里操作一切
 ├── /etc/init.d/frpcmgrd        procd 服务脚本
 ├── /etc/config/frpcmgrd        UCI 配置（端口/令牌/…）
-├── /usr/sbin/frpcmgrd-fetch    二进制拉取器（核心）
+├── /usr/sbin/frpcmgrd-fetch    二进制拉取器（架构检测 + 自建源下载）
 └── /usr/lib/frpcmgrd/VERSION   随包版本号
 
-opkg install 时 → postinst 调 frpcmgrd-fetch →
+opkg install 时 → 只装壳子（不下载二进制）→ enable 服务
+用户开 LuCI（服务 → FRPC Manager）→ 点「下载/更新核心」按钮 →
+  frpcmgrd-fetch：
   ① uname -m + 字节序 识别本机 CPU → 映射到 goreleaser 资产架构
   ② 拉 frpcmgrd_<版本>_linux_<架构>.tar.gz，下载优先级：
        ⒈ 自建 gh-raw 源（首选）   {base}/frpc-mgr-releases/v<版本>/<file>
        ⒉ 公共 GitHub 代理（兜底）  {proxy}https://github.com/.../releases/download/...
        ⒊ GitHub 直连（最后兜底）
   ③ 解出二进制装到 /usr/bin/frpcmgrd
-  ④ enable + start
+→ 在 LuCI 里配端口/令牌、启动、点「打开管理后台」管隧道
 ```
 
-**好处**：一个包覆盖所有架构；彻底甩掉 opkg 架构串映射（不再有 `mips_24kc`/`aarch64_cortex-a53`、不用 `--force-architecture`）；连 mips64le 也能装（只要 Release 有对应 tar.gz）。
+**好处**：一个包覆盖所有架构；彻底甩掉 opkg 架构串映射（不再有 `mips_24kc`/`aarch64_cortex-a53`、不用 `--force-architecture`）；连 mips64le 也能装。装包瞬间完成（不阻塞在下载上），核心由网页按需下载。
 
-**唯一代价**：安装时需要能联网拉二进制（路由器本就联网，且优先走自建源）。装时无网也不致命——壳子照样装上，联网后手动跑一次 `frpcmgrd-fetch` 即可。
+**唯一代价**：下载核心时需能联网（优先走自建源）。依赖 `luci-base` / `luci-compat`（路由器一般已装 LuCI）。
 
 `frpcmgrd-fetch` 支持的 CPU（`uname -m` → 拉取的二进制）：x86_64、aarch64、armv7/armv6、i386、mips/mipsel（按字节序）、mips64/mips64le、riscv64、loongarch64。
 
@@ -50,14 +53,21 @@ opkg install 时 → postinst 调 frpcmgrd-fetch →
 
 ---
 
-## 安装
+## 安装与使用（全程网页操作）
 
 ```sh
 # 上传 frpcmgrd_<版本>-1_all.ipk 到路由器后：
 opkg install frpcmgrd_<版本>-1_all.ipk
 ```
 
-无需挑架构——任何设备装同一个 `all` 包即可。装完会自动识别 CPU、拉二进制、启动，并打印访问地址与自动生成的 API 令牌。
+无需挑架构——任何设备装同一个 `all` 包。装完后**全程在网页里操作**：
+
+1. 打开路由器后台 **LuCI → 服务(Services) → FRPC Manager**
+2. 点 **「下载 / 更新核心」**（自动识别 CPU、优先走自建源拉二进制并安装；可填 `latest` 或指定版本）
+3. 填 **端口 / 登录令牌**，点「保存并重启生效」
+4. 点 **「启动」**，再点 **「打开管理后台」** 进 frpcmgrd 自带界面管隧道
+
+> 也可纯命令行：`frpcmgrd-fetch latest`（下载核心）、`uci set frpcmgrd.main.token=...`、`/etc/init.d/frpcmgrd start`。
 
 > **OpenWrt 25.12+（默认 apk）**：本包是 ipk，面向 opkg（OpenWrt ≤24.10）。25.12 改用 apk(APKv3)，不能直接 `apk add` 此 ipk。见文末「OpenWrt 25.12 / apk」。
 
@@ -147,10 +157,16 @@ openwrt/
 │   │   ├── init.d/frpcmgrd          procd 服务脚本（读 UCI → 注入 FRPCMGR_* 环境变量）
 │   │   └── config/frpcmgrd          UCI 默认配置
 │   └── usr/sbin/frpcmgrd-fetch      按 CPU 联网拉二进制（自建源首选 + 公共代理兜底 + 空间预检）
+├── luci-app-frpcmgr/               LuCI web 壳子
+│   ├── luasrc/controller/frpcmgr.lua   JSON 动作：info/save/download/control
+│   ├── luasrc/view/frpcmgr/main.htm    页面：状态 + 下载核心 + 配置 + 启停 + 开后台
+│   └── root/
+│       ├── usr/share/rpcd/acl.d/luci-app-frpcmgr.json  ACL
+│       └── etc/uci-defaults/40_luci-frpcmgr            刷新 LuCI 菜单缓存
 └── scripts/
-    ├── postinst.sh                 装后调 fetcher 拉二进制 → enable+start
+    ├── postinst.sh                 只装壳子（不下载）+ enable + 刷新 LuCI 菜单 + 引导
     ├── prerm.sh                    卸载/升级前 stop+disable
-    └── postrm.sh                   真正卸载时清理自取的二进制（升级时跳过）
+    └── postrm.sh                   真正卸载时清理下载的二进制（升级时跳过）
 ```
 
 ---
@@ -163,9 +179,10 @@ OpenWrt 25.12（2026-03 发布）默认包管理器换成 **apk**（APKv3 + ADB 
 
 ---
 
-## 后续增强（未实现，已规划）
+## 后续增强
 
-- **luci-app-frpcmgr（瘦面板）**：LuCI 里表单配端口/令牌、按钮启停、显示版本、跳转 frpcmgrd 自带后台、一键触发 `frpcmgrd-fetch` 更新。纯资源包（`PKGARCH:=all`）。
-- **原生 apk（APKv3）产线**：需引入 OpenWrt SDK。
+- ✅ **luci-app-frpcmgr（瘦壳子）** — 已实现并打进 all 包：LuCI 里配端口/令牌、网页下载/更新核心、启停、显示版本/状态、一键打开 frpcmgrd 自带后台。
+- **原生 apk（APKv3）产线**（未实现）：需引入 OpenWrt SDK。
+- **全功能 program_manager**（未实现）：多版本列表/切换/删除、应用自更新（参考 luci-app-frpc）。
 
 > 给后续 LuCI 的稳定契约：服务名 `frpcmgrd`，init `/etc/init.d/frpcmgrd`，UCI `frpcmgrd.main.{http_addr,token,data_dir,version,download_proxy,…}`，拉取器 `/usr/sbin/frpcmgrd-fetch`。改这些名字会破坏后续 LuCI，务必保持兼容。
