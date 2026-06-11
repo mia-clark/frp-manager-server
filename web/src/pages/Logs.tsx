@@ -7,6 +7,7 @@ import {
   ArrowDownOutlined,
 } from '@ant-design/icons';
 import client, { getAPIToken } from '../api/client';
+import { stripLogNoise } from '../utils/log';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -114,14 +115,14 @@ const Logs: React.FC = () => {
           const data = JSON.parse(event.data);
           if (data && typeof data.line === 'string') {
             setLogs((prev) => {
-              const updated = [...prev, data.line];
+              const updated = [...prev, stripLogNoise(data.line)];
               if (updated.length > 1000) updated.shift();
               return updated;
             });
           }
         } catch {
           if (typeof event.data === 'string') {
-            setLogs((prev) => [...prev, event.data]);
+            setLogs((prev) => [...prev, stripLogNoise(event.data)]);
           }
         }
       };

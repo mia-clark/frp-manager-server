@@ -60,6 +60,7 @@ const tomlEditorFontTheme = EditorView.theme({
 import client, { getAPIToken } from '../api/client';
 import { useTheme } from '../theme/ThemeContext';
 import { useEventSubscription } from '../events/EventStreamContext';
+import { stripLogNoise } from '../utils/log';
 import type { InstanceStateData } from '../events/types';
 
 const { Title, Text } = Typography;
@@ -533,7 +534,7 @@ const Configs: React.FC = () => {
       if (resp.status === 200) {
         const data = resp.data;
         const lines: string[] = Array.isArray(data?.lines) ? data.lines : (Array.isArray(data) ? data : []);
-        setMiniLogLines(lines.slice(-MINI_LOGS_MAX));
+        setMiniLogLines(lines.slice(-MINI_LOGS_MAX).map(stripLogNoise));
       }
     } catch {
       // 日志文件不存在很正常（实例从未启动过）— 静默
@@ -562,7 +563,7 @@ const Configs: React.FC = () => {
         if (line === null) return;
         setMiniLogLines((prev) => {
           const next = prev.length >= MINI_LOGS_MAX ? prev.slice(prev.length - MINI_LOGS_MAX + 1) : prev.slice();
-          next.push(line!);
+          next.push(stripLogNoise(line!));
           return next;
         });
       };
