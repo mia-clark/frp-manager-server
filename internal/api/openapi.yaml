@@ -29,6 +29,38 @@ paths:
       responses:
         '200':
           description: OK
+  /api/v1/ui/branding:
+    get:
+      tags: [ui]
+      security: []
+      summary: 读取 UI 品牌（品牌名 + 浏览器标题）
+      description: >
+        返回生效品牌（未自定义的字段回退默认值）。公开端点，便于登录页与
+        浏览器 <title> 在登录前即可渲染自定义值。
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Branding' }
+    put:
+      tags: [ui]
+      summary: 更新 UI 品牌（需鉴权）
+      description: >
+        两个字段均可选：省略的字段保留当前存储值，显式空串则重置为默认。
+        值会被 trim 并限长（app_name ≤ 40、html_title ≤ 120 字符）。
+        返回更新后的生效品牌。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Branding' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Branding' }
   /api/v1/version:
     get:
       tags: [system]
@@ -395,6 +427,14 @@ components:
       type: http
       scheme: bearer
   schemas:
+    Branding:
+      description: >
+        UI 品牌。app_name 用于侧边栏与登录页品牌名，html_title 用于浏览器
+        标签 <title>。GET 返回生效值（空字段已回退默认）；PUT 时两字段可选。
+      type: object
+      properties:
+        app_name:   { type: string, maxLength: 40,  example: "FRPC" }
+        html_title: { type: string, maxLength: 120, example: "FRPC · 内网穿透客户端管理控制台" }
     ClientConfigV1:
       description: |
         Mirrors fatedier/frp v0.68 ClientCommonConfig plus an `frpmgr`

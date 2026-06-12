@@ -3,11 +3,13 @@ import { Input, Button, Form, App } from 'antd';
 import { KeyOutlined, ArrowRightOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import client, { setAPIToken, getAPIToken } from '../api/client';
+import { useBranding } from '../branding/BrandingContext';
 import './Login.css';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const { branding } = useBranding();
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
@@ -46,7 +48,7 @@ const Login: React.FC = () => {
           <div className="frpc-login__badge">
             <ThunderboltOutlined style={{ fontSize: 30, color: '#22d3ee' }} />
           </div>
-          <h1 className="frpc-login__brand">FRPC</h1>
+          <h1 className="frpc-login__brand">{branding.app_name}</h1>
           <div className="frpc-login__sub">客户端管理控制台</div>
         </div>
 

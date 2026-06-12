@@ -11,7 +11,7 @@
 |---|---|
 | 监听地址 | `FRPCMGR_HTTP_ADDR`，默认 `:18080` |
 | 数据目录 | `FRPCMGR_DATA_DIR`，默认 `/data` |
-| 鉴权 | 除 `/api/v1/health` 与 `/api/docs/*` 外，所有 `/api/v1/*` 都要求 `Authorization: Bearer <FRPCMGR_API_TOKEN>` |
+| 鉴权 | 除 `/api/v1/health`、`GET /api/v1/ui/branding` 与 `/api/docs/*` 外，所有 `/api/v1/*` 都要求 `Authorization: Bearer <FRPCMGR_API_TOKEN>` |
 | Content-Type | 除特别说明（`/raw` / `/import/zip` / `/validate` 等）外，**请求/返回均为 `application/json; charset=utf-8`** |
 | 401 时机 | 缺失或错误 Bearer Token；前端拦截器会 `clearAPIToken()` 并跳转 `/login` |
 | 路径 ID 限制 | `id` 不允许 `/ \ : ? * < > | " '`，不能以 `.` 开头，长度 ≤ 64 |
@@ -122,6 +122,39 @@
 
 ```json
 { "status": "updating", "from": "1.2.30", "to": "v1.2.32", "message": "更新已开始，服务即将重启，请稍候…" }
+```
+
+---
+
+### 1.5 GET `/api/v1/ui/branding` — 读取 UI 品牌（**无需鉴权**）
+
+返回**生效品牌**：管理员未自定义的字段回退到默认值。字段为 **snake_case**。
+本端点公开（无需 token），以便登录页与浏览器 `<title>` 在登录前即可显示自定义值。
+
+```json
+{ "app_name": "FRPC", "html_title": "FRPC · 内网穿透客户端管理控制台" }
+```
+
+> 首屏零闪：daemon 在下发 SPA 的 `index.html` 时已就地把 `<title>` 与
+> `window.__FRPC_BRANDING__` 注入为当前品牌，前端首帧即正确，无需等待本接口。
+> 本接口主要供设置页回填与运行时同步。
+
+### 1.6 PUT `/api/v1/ui/branding` — 更新 UI 品牌
+
+| 入参（均可选） | 类型 | 说明 |
+|---|---|---|
+| `app_name` | string | 品牌名（侧边栏 + 登录页主标题），≤ 40 字符 |
+| `html_title` | string | 浏览器标签 `<title>`，≤ 120 字符 |
+
+语义：**省略**的字段保留当前存储值；显式传**空串**则该字段**重置为默认**。值会被
+trim 并按字符（rune）限长。返回更新后的**生效品牌**（结构同 1.5）。持久化在
+`<DataDir>/meta.json` 的 `branding` 字段，清浏览器缓存 / 重登后仍生效。
+
+```jsonc
+// 请求
+{ "app_name": "我的隧道", "html_title": "我的隧道 · 控制台" }
+// 响应 200
+{ "app_name": "我的隧道", "html_title": "我的隧道 · 控制台" }
 ```
 
 ---

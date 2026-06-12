@@ -20,6 +20,7 @@ import client, { getAPIToken, clearAPIToken } from '../api/client';
 import { checkVersion } from '../api/update';
 import ThemeSwitcher from '../theme/ThemeSwitcher';
 import { useEventStream } from '../events/EventStreamContext';
+import { useBranding } from '../branding/BrandingContext';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -32,6 +33,7 @@ const MainLayout: React.FC = () => {
   const { message } = App.useApp();
   const { token } = antdTheme.useToken();
   const stream = useEventStream();
+  const { branding } = useBranding();
 
   const [version, setVersion] = useState<string>('获取中…');
   const [frpVer, setFrpVer] = useState<string>('');
@@ -188,7 +190,7 @@ const MainLayout: React.FC = () => {
                 backgroundClip: 'text',
               }}
             >
-              FRPC
+              {branding.app_name}
             </Text>
             <Text
               style={{
