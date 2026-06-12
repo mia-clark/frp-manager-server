@@ -86,9 +86,14 @@ const ImportExport: React.FC = () => {
       if (status === 'done') {
         const resp = info.file.response || {};
         const n = Array.isArray(resp.imported) ? resp.imported.length : 0;
-        if (resp.branding_restored) {
-          message.success(`${info.file.name} 恢复成功：导入 ${n} 个配置，品牌设置已一并恢复，正在刷新以生效…`);
-          setTimeout(() => window.location.reload(), 1000);
+        const extras = [];
+        if (resp.order_restored) extras.push('实例顺序');
+        if (resp.branding_restored) extras.push('品牌设置');
+        if (extras.length) {
+          const restored = `${extras.join('与')}${extras.length > 1 ? '已一并恢复' : '已恢复'}`;
+          message.success(`${info.file.name} 恢复成功：导入 ${n} 个配置，${restored}${resp.branding_restored ? '，正在刷新以生效…' : ''}`);
+          // 品牌影响侧边栏标题/页面 title，需刷新才生效；仅顺序变化则无需刷新
+          if (resp.branding_restored) setTimeout(() => window.location.reload(), 1000);
         } else {
           message.success(`${info.file.name} 备份包恢复成功：导入 ${n} 个配置`);
         }

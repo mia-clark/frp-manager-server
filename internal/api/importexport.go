@@ -132,7 +132,7 @@ func (h *ImportExportHandler) ImportZIP(w http.ResponseWriter, r *http.Request) 
 		// and re-apply after the configs are in place.
 		if name == "meta.json" {
 			if rc, err := zf.Open(); err == nil {
-				metaRaw, _ = io.ReadAll(io.LimitReader(rc, 1<<20))
+				metaRaw, _ = io.ReadAll(io.LimitReader(rc, 4<<20))
 				rc.Close()
 			}
 			continue
@@ -158,16 +158,17 @@ func (h *ImportExportHandler) ImportZIP(w http.ResponseWriter, r *http.Request) 
 		imported = append(imported, id)
 	}
 
-	brandingRestored := false
+	brandingRestored, orderRestored := false, false
 	if len(metaRaw) > 0 {
 		var err error
-		if brandingRestored, err = h.m.ImportMetaBranding(metaRaw); err != nil {
-			h.log.Warn("restore branding from import failed", slog.Any("err", err))
+		if brandingRestored, orderRestored, err = h.m.ImportMeta(metaRaw); err != nil {
+			h.log.Warn("restore meta from import failed", slog.Any("err", err))
 		}
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"imported":          imported,
 		"branding_restored": brandingRestored,
+		"order_restored":    orderRestored,
 	})
 }
 

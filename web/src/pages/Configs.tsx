@@ -106,6 +106,10 @@ const Configs: React.FC = () => {
   const dragIndexRef = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  // 左栏 FRPS 实例列表拖拽排序
+  const configDragIndexRef = useRef<number | null>(null);
+  const [configDragOverIndex, setConfigDragOverIndex] = useState<number | null>(null);
+
   // 迷你日志状态（最近 1000 行 + 实时 WebSocket 推送 + 自动滚底）
   const MINI_LOGS_MAX = 1000;
   const [miniLogLines, setMiniLogLines] = useState<string[]>([]);
@@ -165,6 +169,25 @@ const Configs: React.FC = () => {
       }
     } catch (err) {
       message.error('无法获取配置列表');
+    }
+  };
+
+  // 左栏 FRPS 实例拖拽排序：仅手柄触发；乐观更新本地顺序，再把完整 id 顺序
+  // 持久化到 meta.sort（POST /configs/reorder）；失败回滚重拉。
+  const handleConfigReorder = async (dropIndex: number) => {
+    const from = configDragIndexRef.current;
+    configDragIndexRef.current = null;
+    setConfigDragOverIndex(null);
+    if (from === null || from === dropIndex) return;
+    const next = [...configs];
+    const [moved] = next.splice(from, 1);
+    next.splice(dropIndex, 0, moved);
+    setConfigs(next);
+    try {
+      await client.post('/api/v1/configs/reorder', { order: next.map((c) => c.id) });
+    } catch {
+      message.error('实例排序保存失败，已回滚');
+      fetchConfigs();
     }
   };
 
@@ -1069,16 +1092,43 @@ const Configs: React.FC = () => {
             ) : (
               <List
                 dataSource={configs}
-                renderItem={(item) => {
+                renderItem={(item, index) => {
                   const isActive = item.id === activeConfigId;
                   const isRunning = item.state === 'started';
+
+                  // 拖拽排序：整张卡片作为放置目标，仅卡内手柄(HolderOutlined)可发起拖拽，
+                  // 其他区域(点击=选中)不触发，防误操作。
+                  const dropProps = {
+                    onDragOver: (e: DragEvent<HTMLDivElement>) => {
+                      if (configDragIndexRef.current === null) return;
+                      e.preventDefault();
+                      if (configDragOverIndex !== index) setConfigDragOverIndex(index);
+                    },
+                    onDrop: (e: DragEvent<HTMLDivElement>) => { e.preventDefault(); handleConfigReorder(index); },
+                  };
+                  const dropStyle: CSSProperties = configDragOverIndex === index
+                    ? { outline: `2px dashed ${token.colorPrimary}`, outlineOffset: 1, borderRadius: 10 }
+                    : {};
+                  const dragHandle = (
+                    <span
+                      draggable
+                      title="拖动排序"
+                      onClick={(e) => e.stopPropagation()}
+                      onDragStart={(e: DragEvent<HTMLSpanElement>) => { configDragIndexRef.current = index; e.dataTransfer.effectAllowed = 'move'; }}
+                      onDragEnd={() => { configDragIndexRef.current = null; setConfigDragOverIndex(null); }}
+                      style={{ cursor: 'grab', color: token.colorTextQuaternary, display: 'inline-flex', flex: '0 0 auto' }}
+                    >
+                      <HolderOutlined />
+                    </span>
+                  );
 
                   // 紧凑模式：只显示名字 + 状态圆点 + 启停按钮，省去 ID 与克隆/删除按钮
                   // 完整功能（重载/克隆/导出/删除）通过右键菜单暴露
                   if (compactList) {
                     return (
+                      <div {...dropProps} style={dropStyle}>
                       <Dropdown menu={buildContextMenu(item)} trigger={['contextMenu']}>
-                        <Tooltip title={`${item.name || item.id} (ID: ${item.id}) · 右键可重载 / 克隆 / 导出 / 删除`} placement="right">
+                        <Tooltip title={`${item.name || item.id} (ID: ${item.id}) · 拖动左侧手柄排序 · 右键可重载 / 克隆 / 导出 / 删除`} placement="right">
                           <Card
                             hoverable
                             size="small"
@@ -1094,6 +1144,7 @@ const Configs: React.FC = () => {
                             styles={{ body: { padding: '8px 10px' } }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {dragHandle}
                               <Badge
                                 status={
                                   item.state === 'started' ? 'success'
@@ -1122,10 +1173,12 @@ const Configs: React.FC = () => {
                           </Card>
                         </Tooltip>
                       </Dropdown>
+                      </div>
                     );
                   }
 
                   return (
+                    <div {...dropProps} style={dropStyle}>
                     <Dropdown menu={buildContextMenu(item)} trigger={['contextMenu']}>
                     <Card
                       hoverable
@@ -1142,9 +1195,12 @@ const Configs: React.FC = () => {
                       styles={{ body: { padding: 16 } }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '8px' }}>
-                        <div>
-                          <Text strong style={{ fontSize: '15px' }}>{item.name || item.id}</Text>
-                          <div><Text type="secondary" style={{ fontSize: '12px' }}>ID: {item.id}</Text></div>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                          <span style={{ marginTop: 2 }}>{dragHandle}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <Text strong style={{ fontSize: '15px' }}>{item.name || item.id}</Text>
+                            <div><Text type="secondary" style={{ fontSize: '12px' }}>ID: {item.id}</Text></div>
+                          </div>
                         </div>
                         {getStatusBadge(item.state)}
                       </div>
@@ -1215,6 +1271,7 @@ const Configs: React.FC = () => {
                       </div>
                     </Card>
                     </Dropdown>
+                    </div>
                   );
                 }}
               />

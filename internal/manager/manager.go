@@ -533,29 +533,45 @@ func (m *Manager) SetBranding(in Branding) (Branding, error) {
 	return in.Effective(), nil
 }
 
-// ImportMetaBranding parses a meta.json blob (from an /export/all backup) and
-// restores the operator branding from it. It deliberately ignores sort /
-// log_view_since / auto_start: a config-restore must not silently reorder the
-// instance list or hide logs — branding is the durable identity users want to
-// keep across reinstalls. Returns true when a non-empty branding was applied.
-func (m *Manager) ImportMetaBranding(raw []byte) (bool, error) {
+// ImportMeta parses a meta.json blob (from an /export/all backup) and restores
+// the operator branding and the instance display order from it. Call it AFTER
+// the configs themselves are in place so Reorder can resolve the ids.
+//
+// It deliberately ignores log_view_since / auto_start (transient/legacy). Sort
+// is restored because preserving the instance order across an export→import to
+// another host is an explicit goal; Reorder keeps only ids that exist now, and
+// any imported config not listed in the backup sort falls to the end.
+//
+// Returns whether a non-empty branding and a non-empty order were applied.
+func (m *Manager) ImportMeta(raw []byte) (brandingRestored, orderRestored bool, err error) {
 	var meta Meta
 	if err := json.Unmarshal(raw, &meta); err != nil {
-		return false, err
+		return false, false, err
 	}
-	if meta.Branding == nil {
-		return false, nil
+	// Branding and order are restored independently: a failure on one is
+	// recorded but never blocks the other (first error is returned).
+	if meta.Branding != nil {
+		b := *meta.Branding
+		if strings.TrimSpace(b.AppName) != "" ||
+			strings.TrimSpace(b.AppSubtitle) != "" ||
+			strings.TrimSpace(b.HTMLTitle) != "" {
+			if _, e := m.SetBranding(b); e != nil {
+				err = e
+			} else {
+				brandingRestored = true
+			}
+		}
 	}
-	b := *meta.Branding
-	if strings.TrimSpace(b.AppName) == "" &&
-		strings.TrimSpace(b.AppSubtitle) == "" &&
-		strings.TrimSpace(b.HTMLTitle) == "" {
-		return false, nil
+	if len(meta.Sort) > 0 {
+		if e := m.Reorder(meta.Sort); e != nil {
+			if err == nil {
+				err = e
+			}
+		} else {
+			orderRestored = true
+		}
 	}
-	if _, err := m.SetBranding(b); err != nil {
-		return false, err
-	}
-	return true, nil
+	return brandingRestored, orderRestored, err
 }
 
 // truncateRunes caps s to at most max runes (not bytes), so multi-byte CJK
