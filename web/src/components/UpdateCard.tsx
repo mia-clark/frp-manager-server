@@ -130,9 +130,10 @@ const UpdateCard: React.FC = () => {
     }
   }, [info, message]);
 
-  // 自更新日志按 [*]/[+]/[!]/[x] 前缀着色, 终端观感
+  // 自更新日志按前缀着色, 终端观感
   const logLineColor = (line: string): string => {
     const t = line.trimStart();
+    if (t.startsWith('▶')) return '#569cd6';     // 阶段头 亮蓝
     if (t.startsWith('[+]')) return '#4ec9b0';   // 成功 青绿
     if (t.startsWith('[!]')) return '#dcdcaa';   // 警告 黄
     if (t.startsWith('[x]')) return '#f48771';   // 错误 红
@@ -223,7 +224,7 @@ const UpdateCard: React.FC = () => {
                 }}
               >
                 {updateLog.split('\n').map((line, i) => (
-                  <div key={i} style={{ color: logLineColor(line) }}>{line || ' '}</div>
+                  <div key={i} style={{ color: logLineColor(line), fontWeight: line.trimStart().startsWith('▶') ? 600 : 400 }}>{line || ' '}</div>
                 ))}
               </div>
             </div>
