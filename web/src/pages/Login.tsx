@@ -49,7 +49,7 @@ const Login: React.FC = () => {
             <ThunderboltOutlined style={{ fontSize: 30, color: '#22d3ee' }} />
           </div>
           <h1 className="frpc-login__brand">{branding.app_name}</h1>
-          <div className="frpc-login__sub">客户端管理控制台</div>
+          <div className="frpc-login__sub">{branding.app_subtitle}</div>
         </div>
 
         <Form name="login" onFinish={onFinish} layout="vertical" requiredMark={false}>

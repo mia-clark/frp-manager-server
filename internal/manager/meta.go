@@ -28,16 +28,18 @@ type Meta struct {
 // meta.json so it survives browser cache clears and re-logins. Empty fields
 // resolve to the Default* constants via Effective().
 type Branding struct {
-	AppName   string `json:"app_name,omitempty"`
-	HTMLTitle string `json:"html_title,omitempty"`
+	AppName     string `json:"app_name,omitempty"`
+	AppSubtitle string `json:"app_subtitle,omitempty"`
+	HTMLTitle   string `json:"html_title,omitempty"`
 }
 
 // Default branding values — the single source of truth, matching the
 // strings the frontend previously hard-coded. Used as fallback whenever a
 // field is unset/empty.
 const (
-	DefaultAppName   = "FRPC"
-	DefaultHTMLTitle = "FRPC · 内网穿透客户端管理控制台"
+	DefaultAppName     = "FRPC"
+	DefaultAppSubtitle = "客户端管理面板"
+	DefaultHTMLTitle   = "FRPC · 内网穿透客户端管理控制台"
 )
 
 // Effective returns a copy with every empty field filled from the defaults,
@@ -46,6 +48,9 @@ func (b Branding) Effective() Branding {
 	out := b
 	if strings.TrimSpace(out.AppName) == "" {
 		out.AppName = DefaultAppName
+	}
+	if strings.TrimSpace(out.AppSubtitle) == "" {
+		out.AppSubtitle = DefaultAppSubtitle
 	}
 	if strings.TrimSpace(out.HTMLTitle) == "" {
 		out.HTMLTitle = DefaultHTMLTitle

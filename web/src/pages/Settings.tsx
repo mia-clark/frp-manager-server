@@ -41,16 +41,22 @@ const Settings: React.FC = () => {
   useEffect(() => {
     brandForm.setFieldsValue({
       app_name: branding.app_name,
+      app_subtitle: branding.app_subtitle,
       html_title: branding.html_title,
     });
   }, [branding, brandForm]);
 
-  const onSaveBranding = async (vals: { app_name?: string; html_title?: string }) => {
+  const onSaveBranding = async (vals: {
+    app_name?: string;
+    app_subtitle?: string;
+    html_title?: string;
+  }) => {
     setSavingBrand(true);
     try {
       // 空串显式发给后端 → 重置为默认；后端返回生效值。
       const next = await updateBranding({
         app_name: vals.app_name ?? '',
+        app_subtitle: vals.app_subtitle ?? '',
         html_title: vals.html_title ?? '',
       });
       setBrandingLocal(next); // 即时刷新侧边栏 / 登录页 / 浏览器标题
@@ -188,6 +194,13 @@ const Settings: React.FC = () => {
             extra="显示在侧边栏与登录页顶部。留空恢复默认「FRPC」。"
           >
             <Input placeholder="FRPC" maxLength={40} allowClear />
+          </Form.Item>
+          <Form.Item
+            label="副标题"
+            name="app_subtitle"
+            extra="品牌名下方的小字（侧边栏与登录页）。留空恢复默认「客户端管理面板」。"
+          >
+            <Input placeholder="客户端管理面板" maxLength={60} allowClear />
           </Form.Item>
           <Form.Item
             label="浏览器标签标题"

@@ -429,12 +429,14 @@ components:
   schemas:
     Branding:
       description: >
-        UI 品牌。app_name 用于侧边栏与登录页品牌名，html_title 用于浏览器
-        标签 <title>。GET 返回生效值（空字段已回退默认）；PUT 时两字段可选。
+        UI 品牌。app_name 用于侧边栏与登录页品牌名，app_subtitle 用于侧边栏与
+        登录页副标题，html_title 用于浏览器标签 <title>。GET 返回生效值（空字段
+        已回退默认）；PUT 时各字段可选（省略保留、空串重置为默认）。
       type: object
       properties:
-        app_name:   { type: string, maxLength: 40,  example: "FRPC" }
-        html_title: { type: string, maxLength: 120, example: "FRPC · 内网穿透客户端管理控制台" }
+        app_name:     { type: string, maxLength: 40,  example: "FRPC" }
+        app_subtitle: { type: string, maxLength: 60,  example: "客户端管理面板" }
+        html_title:   { type: string, maxLength: 120, example: "FRPC · 内网穿透客户端管理控制台" }
     ClientConfigV1:
       description: |
         Mirrors fatedier/frp v0.68 ClientCommonConfig plus an `frpmgr`

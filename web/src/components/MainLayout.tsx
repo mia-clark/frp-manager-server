@@ -200,7 +200,7 @@ const MainLayout: React.FC = () => {
                 whiteSpace: 'nowrap',
               }}
             >
-              客户端管理面板
+              {branding.app_subtitle}
             </Text>
           </div>
         </div>

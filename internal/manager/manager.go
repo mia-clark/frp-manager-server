@@ -520,6 +520,7 @@ func (m *Manager) GetBrandingRaw() Branding {
 // Returns the effective branding after the write.
 func (m *Manager) SetBranding(in Branding) (Branding, error) {
 	in.AppName = truncateRunes(strings.TrimSpace(in.AppName), 40)
+	in.AppSubtitle = truncateRunes(strings.TrimSpace(in.AppSubtitle), 60)
 	in.HTMLTitle = truncateRunes(strings.TrimSpace(in.HTMLTitle), 120)
 	if err := m.meta.setBranding(in); err != nil {
 		return Branding{}, err

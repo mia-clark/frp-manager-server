@@ -3,12 +3,14 @@ import client from './client';
 // UI 品牌。字段为 snake_case，逐字对齐后端 internal/api/ui.go 的 brandingResp。
 export interface Branding {
   app_name: string;
+  app_subtitle: string;
   html_title: string;
 }
 
-// 默认值（与后端 manager.DefaultAppName / DefaultHTMLTitle 一致），仅作前端兜底。
+// 默认值（与后端 manager.Default* 常量一致），仅作前端兜底。
 export const DEFAULT_BRANDING: Branding = {
   app_name: 'FRPC',
+  app_subtitle: '客户端管理面板',
   html_title: 'FRPC · 内网穿透客户端管理控制台',
 };
 
@@ -24,6 +26,7 @@ export function readBootstrapBranding(): Branding {
   const b = typeof window !== 'undefined' ? window.__FRPC_BRANDING__ : undefined;
   return {
     app_name: b?.app_name?.trim() || DEFAULT_BRANDING.app_name,
+    app_subtitle: b?.app_subtitle?.trim() || DEFAULT_BRANDING.app_subtitle,
     html_title: b?.html_title?.trim() || DEFAULT_BRANDING.html_title,
   };
 }

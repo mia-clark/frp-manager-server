@@ -26,22 +26,27 @@ func NewUIHandler(mgr *manager.Manager) *UIHandler {
 // project's Snapshot / system convention (this is NOT part of the
 // camelCase ClientConfigV1 subtree).
 type brandingResp struct {
-	AppName   string `json:"app_name"`
-	HTMLTitle string `json:"html_title"`
+	AppName     string `json:"app_name"`
+	AppSubtitle string `json:"app_subtitle"`
+	HTMLTitle   string `json:"html_title"`
 }
 
-// brandingReq is the PUT body. Both fields are optional pointers: an omitted
+// brandingReq is the PUT body. Every field is an optional pointer: an omitted
 // field keeps the current stored value, an empty string resets to default.
 type brandingReq struct {
-	AppName   *string `json:"app_name,omitempty"`
-	HTMLTitle *string `json:"html_title,omitempty"`
+	AppName     *string `json:"app_name,omitempty"`
+	AppSubtitle *string `json:"app_subtitle,omitempty"`
+	HTMLTitle   *string `json:"html_title,omitempty"`
+}
+
+func toBrandingResp(b manager.Branding) brandingResp {
+	return brandingResp{AppName: b.AppName, AppSubtitle: b.AppSubtitle, HTMLTitle: b.HTMLTitle}
 }
 
 // GetBranding (public, no auth) returns the effective branding so the login
 // page and the <title> can render before the user is authenticated.
 func (h *UIHandler) GetBranding(w http.ResponseWriter, r *http.Request) {
-	b := h.mgr.GetBranding()
-	WriteJSON(w, http.StatusOK, brandingResp{AppName: b.AppName, HTMLTitle: b.HTMLTitle})
+	WriteJSON(w, http.StatusOK, toBrandingResp(h.mgr.GetBranding()))
 }
 
 // UpdateBranding (auth) persists the branding. Omitted fields are preserved
@@ -55,6 +60,9 @@ func (h *UIHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
 	if req.AppName != nil {
 		next.AppName = *req.AppName
 	}
+	if req.AppSubtitle != nil {
+		next.AppSubtitle = *req.AppSubtitle
+	}
 	if req.HTMLTitle != nil {
 		next.HTMLTitle = *req.HTMLTitle
 	}
@@ -63,7 +71,7 @@ func (h *UIHandler) UpdateBranding(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusInternalServerError, CodeInternal, "persist branding: "+err.Error(), nil)
 		return
 	}
-	WriteJSON(w, http.StatusOK, brandingResp{AppName: eff.AppName, HTMLTitle: eff.HTMLTitle})
+	WriteJSON(w, http.StatusOK, toBrandingResp(eff))
 }
 
 var titleRe = regexp.MustCompile(`(?is)<title>.*?</title>`)
@@ -86,7 +94,7 @@ func (h *UIHandler) InjectBranding(index []byte) []byte {
 		return "<title>" + html.EscapeString(b.HTMLTitle) + "</title>"
 	})
 
-	boot, _ := json.Marshal(brandingResp{AppName: b.AppName, HTMLTitle: b.HTMLTitle})
+	boot, _ := json.Marshal(toBrandingResp(b))
 	script := "<script>window.__FRPC_BRANDING__=" + string(boot) + ";</script>"
 	if strings.Contains(s, "</head>") {
 		s = strings.Replace(s, "</head>", script+"</head>", 1)

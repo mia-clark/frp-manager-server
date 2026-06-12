@@ -17,11 +17,11 @@ func TestBranding_RoundTripAndDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if got := m.GetBranding(); got.AppName != DefaultAppName || got.HTMLTitle != DefaultHTMLTitle {
+	if got := m.GetBranding(); got.AppName != DefaultAppName || got.AppSubtitle != DefaultAppSubtitle || got.HTMLTitle != DefaultHTMLTitle {
 		t.Fatalf("default branding mismatch: %+v", got)
 	}
 
-	if _, err := m.SetBranding(Branding{AppName: "  我的隧道  ", HTMLTitle: "我的隧道 · 控制台"}); err != nil {
+	if _, err := m.SetBranding(Branding{AppName: "  我的隧道  ", AppSubtitle: " 内网穿透面板 ", HTMLTitle: "我的隧道 · 控制台"}); err != nil {
 		t.Fatalf("SetBranding: %v", err)
 	}
 
@@ -33,6 +33,9 @@ func TestBranding_RoundTripAndDefaults(t *testing.T) {
 	got := m2.GetBranding()
 	if got.AppName != "我的隧道" {
 		t.Fatalf("AppName trim/persist failed: %q", got.AppName)
+	}
+	if got.AppSubtitle != "内网穿透面板" {
+		t.Fatalf("AppSubtitle trim/persist failed: %q", got.AppSubtitle)
 	}
 	if got.HTMLTitle != "我的隧道 · 控制台" {
 		t.Fatalf("HTMLTitle persist failed: %q", got.HTMLTitle)
@@ -82,7 +85,7 @@ func TestBranding_BackwardCompatRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if got := m.GetBranding(); got.AppName != DefaultAppName || got.HTMLTitle != DefaultHTMLTitle {
+	if got := m.GetBranding(); got.AppName != DefaultAppName || got.AppSubtitle != DefaultAppSubtitle || got.HTMLTitle != DefaultHTMLTitle {
 		t.Fatalf("old meta.json should yield defaults, got %+v", got)
 	}
 }
