@@ -1,90 +1,220 @@
 <%+header%>
 
 <style>
-	.fm-card{background:var(--background-color-medium,#fff);border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:16px 18px;margin-bottom:14px}
-	.fm-card h3{margin:0 0 12px;font-size:15px;display:flex;align-items:center;gap:8px}
-	.fm-row{display:flex;flex-wrap:wrap;gap:8px 18px;margin-bottom:8px}
-	.fm-kv{min-width:180px}
-	.fm-kv .k{font-size:12px;opacity:.6}
-	.fm-kv .v{font-weight:600}
-	.fm-form label{display:block;font-size:13px;margin:10px 0 4px;opacity:.85}
-	.fm-form input,.fm-form select{width:100%;max-width:360px;padding:7px 9px;border:1px solid rgba(0,0,0,.18);border-radius:6px;box-sizing:border-box}
-	.fm-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-	.fm-btn{cursor:pointer;border:0;border-radius:7px;padding:8px 14px;font-size:13px;color:#fff;background:#5b7cfa}
-	.fm-btn.gray{background:#6b7280}.fm-btn.green{background:#16a34a}.fm-btn.red{background:#dc2626}.fm-btn.amber{background:#d97706}
-	.fm-btn:disabled{opacity:.45;cursor:not-allowed}
-	.fm-badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:600}
-	.fm-on{background:#dcfce7;color:#166534}.fm-off{background:#fee2e2;color:#991b1b}.fm-warn{background:#fef3c7;color:#92400e}
-	#fm_log{display:none;white-space:pre-wrap;background:#0b1020;color:#d1d5db;font-family:monospace;font-size:12px;padding:10px;border-radius:8px;max-height:240px;overflow:auto;margin-top:10px}
-	.fm-hint{font-size:12px;opacity:.65;margin-top:4px}
-	/* 浮动提示 toast */
-	#fm_toasts{position:fixed;top:16px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:340px}
-	.fm-toast{padding:10px 14px;border-radius:8px;color:#fff;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.18);animation:fmIn .18s ease;display:flex;align-items:center;gap:8px}
-	.fm-toast.info{background:#2563eb}.fm-toast.success{background:#16a34a}.fm-toast.error{background:#dc2626}.fm-toast.warn{background:#d97706}
-	.fm-toast .sp{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:fmSpin .7s linear infinite;flex:0 0 auto}
+	/* 作用域全部收敛到 .fmx，既不污染 LuCI 其它页面，又以特异性压过主题(Argon)对 h2/h3/button/input 的改写 */
+
+	/* 根容器：作为 #maincontent>.container(flex 列) 的唯一子项，隔离主题 flex/gap */
+	.fmx{max-width:980px;display:block;color:var(--text-color,#333)}
+	.fmx *{box-sizing:border-box}
+
+	/* 标题（自管，不用 h2 以免被主题渲染成卡片） */
+	.fmx-title{font-size:1.2rem;font-weight:700;color:var(--gray-dark,#32325d);background:var(--background-color-medium,#fff);padding:14px 18px;border-radius:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+	.fmx-title .t{display:flex;align-items:center;gap:8px}
+
+	/* 状态药丸 */
+	.fmx .fm-pill{display:inline-flex;align-items:center;gap:7px;padding:5px 13px;border-radius:999px;font-size:12.5px;font-weight:600;background:rgba(107,114,128,.14);color:#6b7280;white-space:nowrap}
+	.fmx .fm-pill.on{background:#dcfce7;color:#166534}.fmx .fm-pill.off{background:#fee2e2;color:#991b1b}.fmx .fm-pill.warn{background:#fef3c7;color:#92400e}
+	.fmx .fm-pdot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}
+	.fmx .fm-pill.on .fm-pdot{animation:fmPulse 1.5s ease-in-out infinite}
+
+	/* Tab 导航 */
+	.fmx .fm-tabs{display:flex;align-items:center;gap:2px;margin:0 0 14px;border-bottom:1px solid rgba(0,0,0,.1)}
+	.fmx .fm-tab{cursor:pointer;border:0;background:transparent;height:auto;padding:11px 20px;font-size:14px;font-weight:600;color:var(--text-color,#374151);opacity:.55;border-bottom:2px solid transparent;border-radius:7px 7px 0 0;transition:opacity .15s,color .15s,background .15s}
+	.fmx .fm-tab:hover{opacity:.9;background:rgba(127,127,127,.08)}
+	.fmx .fm-tab.active{opacity:1;color:#5b7cfa;border-bottom-color:#5b7cfa}
+	.fmx .fm-tabs .fm-pill{margin-left:auto}
+	.fmx .fm-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#dc2626;vertical-align:middle;margin-left:5px;animation:fmPulse 1.4s ease-in-out infinite}
+
+	/* 卡片 */
+	.fmx .fm-card{background:var(--background-color-medium,#fff);border:1px solid rgba(0,0,0,.08);border-radius:12px;padding:18px 20px;margin:0 0 14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+	.fmx-h3{margin:0 0 4px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px;color:inherit;background:none;padding:0;border:0}
+	.fmx .fm-desc{font-size:12.5px;opacity:.6;margin:0 0 14px;line-height:1.5}
+
+	/* 状态网格 */
+	.fmx .fm-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin:0 0 16px}
+	.fmx .fm-stat{display:flex;align-items:center;gap:11px;padding:11px 13px;background:rgba(127,127,127,.06);border:1px solid rgba(0,0,0,.07);border-radius:10px}
+	.fmx .fm-stat .si{font-size:20px;line-height:1;flex:0 0 auto;opacity:.85}
+	.fmx .fm-stat .sl{font-size:12px;opacity:.6}
+	.fmx .fm-stat .sv{font-weight:700;font-size:14px;margin-top:2px}
+	.fmx .fm-badge{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:600}
+	.fmx .fm-on{background:#dcfce7;color:#166534}.fmx .fm-off{background:#fee2e2;color:#991b1b}.fmx .fm-warn{background:#fef3c7;color:#92400e}
+
+	/* 表单 */
+	.fmx .fm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px 20px;max-width:800px}
+	.fmx .fm-field{display:flex;flex-direction:column;min-width:0}
+	.fmx .fm-field.full{grid-column:1/-1}
+	.fmx .fm-field label{font-size:13px;margin:0 0 6px;opacity:.85;font-weight:500}
+	.fmx .fm-field input,.fmx .fm-field select{width:100%;height:auto;padding:8px 11px;border:1px solid var(--border-color-medium,rgba(0,0,0,.18));border-radius:8px;background:var(--background-color-medium,#fff);color:inherit;font-size:13px;transition:border-color .12s,box-shadow .12s}
+	.fmx .fm-field input:focus,.fmx .fm-field select:focus{outline:none;border-color:#5b7cfa;box-shadow:0 0 0 3px rgba(91,124,250,.16)}
+	.fmx .fm-sub{font-size:11.5px;opacity:.55;margin-top:5px;line-height:1.5}
+	.fmx .fm-inline{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap}
+	.fmx .fm-inline input{flex:1 1 200px}
+
+	/* 按钮体系（height:auto 抵消主题强制的 2.5rem 高） */
+	.fmx .fm-btns{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:4px}
+	.fmx .fm-spacer{flex:1 1 auto;min-width:8px}
+	.fmx .fm-btn{display:inline-flex;align-items:center;gap:6px;cursor:pointer;border:1px solid transparent;border-radius:8px;height:auto;padding:8px 16px;font-size:13px;font-weight:600;color:#fff;background:#5b7cfa;transition:filter .12s,box-shadow .12s,opacity .12s;line-height:1.2}
+	.fmx .fm-btn:hover:not(:disabled){filter:brightness(1.07);box-shadow:0 2px 8px rgba(0,0,0,.12)}
+	.fmx .fm-btn:active:not(:disabled){filter:brightness(.94);box-shadow:none}
+	.fmx .fm-btn.green{background:#16a34a}.fmx .fm-btn.red{background:#dc2626}.fmx .fm-btn.amber{background:#d97706}
+	.fmx .fm-btn.ghost{background:transparent;color:var(--text-color,#374151);border-color:rgba(0,0,0,.2)}
+	.fmx .fm-btn.ghost:hover:not(:disabled){background:rgba(127,127,127,.1);box-shadow:none}
+	.fmx .fm-btn.sm{padding:7px 12px;font-size:12px}
+	.fmx .fm-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;filter:none}
+
+	/* 缺核心提示条 */
+	.fmx .fm-notice{background:#fffbeb;color:#92400e;border:1px solid #fde68a;border-radius:9px;padding:11px 14px;font-size:13px;margin:0 0 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;line-height:1.5}
+	.fmx .fm-notice b{font-weight:700}
+	.fmx .fm-notice a{color:#b45309;font-weight:700;text-decoration:underline;cursor:pointer}
+	.fmx .fm-notice a:hover{color:#92400e}
+
+	/* 日志 */
+	.fmx #fm_log{display:none;white-space:pre-wrap;word-break:break-all;background:#0b1020;color:#d1d5db;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;padding:12px 14px;border-radius:9px;max-height:280px;overflow:auto;margin-top:14px;border:1px solid rgba(255,255,255,.06)}
+	.fmx .fm-hint{font-size:12px;opacity:.6;margin-top:10px;line-height:1.5}
+
+	/* 浮动提示 toast（fixed，位置与 DOM 无关） */
+	.fmx #fm_toasts{position:fixed;top:16px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px}
+	.fmx .fm-toast{padding:11px 15px;border-radius:9px;color:#fff;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.2);animation:fmIn .18s ease;display:flex;align-items:center;gap:9px;line-height:1.4}
+	.fmx .fm-toast.info{background:#2563eb}.fmx .fm-toast.success{background:#16a34a}.fmx .fm-toast.error{background:#dc2626}.fmx .fm-toast.warn{background:#d97706}
+	.fmx .fm-toast .sp{width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:fmSpin .7s linear infinite;flex:0 0 auto}
+
 	@keyframes fmIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
 	@keyframes fmSpin{to{transform:rotate(360deg)}}
+	@keyframes fmPulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+	@media (max-width:520px){
+		.fmx .fm-card{padding:15px 15px}
+		.fmx .fm-tab{padding:10px 14px;font-size:13px}
+		.fmx .fm-btns .fm-spacer{display:none}
+	}
 </style>
 
-<div id="fm_toasts"></div>
+<div class="fmx">
 
-<h2><%:FRPC Manager · 控制台%></h2>
+	<div id="fm_toasts"></div>
 
-<div class="fm-card">
-	<h3>📊 <%:运行状态%></h3>
-	<div class="fm-row">
-		<div class="fm-kv"><div class="k"><%:核心二进制%></div><div class="v" id="fm_binstate">—</div></div>
-		<div class="fm-kv"><div class="k"><%:版本%></div><div class="v" id="fm_version">—</div></div>
-		<div class="fm-kv"><div class="k"><%:服务%></div><div class="v" id="fm_runstate">—</div></div>
-		<div class="fm-kv"><div class="k"><%:CPU 架构%></div><div class="v" id="fm_arch">—</div></div>
+	<div class="fmx-title">
+		<span class="t">🧭 <%:FRPC Manager · 控制台%></span>
+		<span class="fm-pill" id="fm_pill"><span class="fm-pdot"></span><span id="fm_pilltxt"><%:连接中…%></span></span>
 	</div>
-	<div class="fm-btns">
-		<button class="fm-btn green" id="fm_start" onclick="ctl('start', this)"><%:启动%></button>
-		<button class="fm-btn red"   id="fm_stop"  onclick="ctl('stop', this)"><%:停止%></button>
-		<button class="fm-btn gray"  id="fm_restart" onclick="ctl('restart', this)"><%:重启%></button>
-		<button class="fm-btn" id="fm_open" onclick="openBackend()"><%:打开管理后台%></button>
-	</div>
-	<div class="fm-hint"><%:隧道（代理）的增删改启停在 frpcmgrd 自带后台里操作，点「打开管理后台」即可。%></div>
-</div>
 
-<div class="fm-card">
-	<h3>⬇️ <%:核心二进制%></h3>
-	<div class="fm-hint"><%:首次使用请先下载核心。下载优先走自建源，公共代理 / GitHub 直连兜底。%></div>
-	<div class="fm-form">
-		<label><%:拉取版本（留空=随包版本；填 latest=最新）%></label>
-		<input type="text" id="fm_dlver" value="latest" placeholder="latest / 1.2.39 / 留空">
+	<div class="fm-tabs">
+		<button type="button" class="fm-tab active" data-fmtab="overview" onclick="switchTab('overview')">📊 <%:概览 / 控制%></button>
+		<button type="button" class="fm-tab" data-fmtab="core" onclick="switchTab('core')">⬇️ <%:核心下载%><span id="fm_tabdot" class="fm-dot" style="display:none"></span></button>
 	</div>
-	<div class="fm-btns">
-		<button class="fm-btn amber" id="fm_dl" onclick="download(this)"><%:下载 / 更新核心%></button>
-		<button class="fm-btn gray" onclick="toggleLog()"><%:显示/隐藏日志%></button>
-	</div>
-	<pre id="fm_log"></pre>
-</div>
 
-<div class="fm-card">
-	<h3>⚙️ <%:基本配置%></h3>
-	<div class="fm-form">
-		<label><%:监听地址（:端口 或 ip:端口）%></label>
-		<input type="text" id="cfg_http_addr" placeholder=":18080">
-		<label><%:登录令牌（API Token，后台访问凭证）%></label>
-		<input type="text" id="cfg_token" placeholder="留空=首次启动自动生成">
-		<label><%:数据目录（须持久化路径，勿用 /tmp、/var）%></label>
-		<input type="text" id="cfg_data_dir" placeholder="/usr/lib/frpcmgrd">
-		<label><%:日志级别%></label>
-		<select id="cfg_log_level">
-			<option value="trace">trace</option><option value="debug">debug</option>
-			<option value="info">info</option><option value="warn">warn</option><option value="error">error</option>
-		</select>
+	<!-- ============ Tab 1：概览 / 控制 ============ -->
+	<div class="fm-panel" id="tab_overview">
+
+		<div class="fm-card">
+			<div class="fmx-h3">📊 <%:运行状态%></div>
+			<div class="fm-desc"><%:服务的启停与管理后台入口；隧道（代理）的增删改请进入管理后台操作。%></div>
+
+			<div class="fm-notice" id="fm_nobin" style="display:none">
+				<span>⚠️</span>
+				<span><b><%:尚未安装核心二进制%></b>，<%:服务无法启动。%></span>
+				<a onclick="switchTab('core')"><%:前往「核心下载」页下载 →%></a>
+				<span><%:完成后回到本页点「启动」。%></span>
+			</div>
+
+			<div class="fm-stats">
+				<div class="fm-stat"><span class="si">📦</span><div><div class="sl"><%:核心二进制%></div><div class="sv" id="fm_binstate">—</div></div></div>
+				<div class="fm-stat"><span class="si">🏷️</span><div><div class="sl"><%:版本%></div><div class="sv" id="fm_version">—</div></div></div>
+				<div class="fm-stat"><span class="si">⚡</span><div><div class="sl"><%:服务%></div><div class="sv" id="fm_runstate">—</div></div></div>
+				<div class="fm-stat"><span class="si">🖥️</span><div><div class="sl"><%:CPU 架构%></div><div class="sv" id="fm_arch">—</div></div></div>
+			</div>
+
+			<div class="fm-btns">
+				<button class="fm-btn green" id="fm_start" onclick="ctl('start', this)"><%:启动%></button>
+				<button class="fm-btn red"   id="fm_stop"  onclick="ctl('stop', this)"><%:停止%></button>
+				<button class="fm-btn ghost" id="fm_restart" onclick="ctl('restart', this)"><%:重启%></button>
+				<span class="fm-spacer"></span>
+				<button class="fm-btn" id="fm_open" onclick="openBackend()"><%:打开管理后台%> ↗</button>
+			</div>
+		</div>
+
+		<div class="fm-card">
+			<div class="fmx-h3">⚙️ <%:基本配置%></div>
+			<div class="fm-desc"><%:守护进程的监听端口、登录令牌与数据目录；保存后会自动重启服务生效。%></div>
+
+			<div class="fm-grid">
+				<div class="fm-field">
+					<label><%:监听地址%></label>
+					<input type="text" id="cfg_http_addr" placeholder=":18080">
+					<div class="fm-sub"><%:格式 :端口（所有网卡）或 ip:端口（指定网卡）。%></div>
+				</div>
+				<div class="fm-field">
+					<label><%:日志级别%></label>
+					<select id="cfg_log_level">
+						<option value="trace">trace</option><option value="debug">debug</option>
+						<option value="info">info</option><option value="warn">warn</option><option value="error">error</option>
+					</select>
+					<div class="fm-sub"><%:排障时调 debug / trace，日常用 info 即可。%></div>
+				</div>
+				<div class="fm-field full">
+					<label><%:登录令牌（API Token · 管理后台访问凭证）%></label>
+					<div class="fm-inline">
+						<input type="password" id="cfg_token" placeholder="<%:留空 = 首次启动自动生成%>" autocomplete="off">
+						<button type="button" class="fm-btn ghost sm" id="fm_tokeneye" onclick="toggleToken()">👁 <%:显示%></button>
+						<button type="button" class="fm-btn ghost sm" onclick="copyToken(this)">📋 <%:复制%></button>
+					</div>
+					<div class="fm-sub"><%:用于登录 frpcmgrd 管理后台，请妥善保管；泄露后他人可控制你的隧道。%></div>
+				</div>
+				<div class="fm-field full">
+					<label><%:数据目录%></label>
+					<input type="text" id="cfg_data_dir" placeholder="/usr/lib/frpcmgrd">
+					<div class="fm-sub"><%:存放隧道配置与日志，须为持久化路径；勿用 /tmp、/var 等易失目录，否则重启丢配置。%></div>
+				</div>
+			</div>
+
+			<div class="fm-btns" style="margin-top:16px">
+				<button class="fm-btn" id="fm_save" onclick="saveCfg(this)"><%:保存并重启生效%></button>
+			</div>
+		</div>
+
 	</div>
-	<div class="fm-btns">
-		<button class="fm-btn" id="fm_save" onclick="saveCfg(this)"><%:保存并重启生效%></button>
+
+	<!-- ============ Tab 2：核心下载 ============ -->
+	<div class="fm-panel" id="tab_core" style="display:none">
+
+		<div class="fm-card">
+			<div class="fmx-h3">⬇️ <%:核心二进制%></div>
+			<div class="fm-desc"><%:首次使用请先下载核心。下载优先走自建源，公共代理 / GitHub 直连兜底。%></div>
+
+			<div class="fm-field" style="max-width:380px">
+				<label><%:拉取版本%></label>
+				<input type="text" id="fm_dlver" value="latest" placeholder="latest / 1.2.39 / 留空">
+				<div class="fm-sub"><%:留空 = 随包版本；填 latest = 最新；也可指定具体版本号。%></div>
+			</div>
+
+			<div class="fm-btns" style="margin-top:16px">
+				<button class="fm-btn amber" id="fm_dl" onclick="download(this)"><%:下载 / 更新核心%></button>
+				<button class="fm-btn ghost" id="fm_logbtn" onclick="toggleLog()"><%:显示日志%></button>
+				<button class="fm-btn ghost" onclick="copyLog(this)"><%:复制日志%></button>
+			</div>
+
+			<pre id="fm_log"></pre>
+			<div class="fm-hint"><%:核心就绪后，回到「概览 / 控制」页点「启动」即可运行服务。%></div>
+		</div>
+
 	</div>
-	<div class="fm-hint"><%:保存后会自动重启服务使端口/令牌生效。%></div>
+
 </div>
 
 <script type="text/javascript">//<![CDATA[
 	var BASE = '<%=luci.dispatcher.build_url("admin/services/frpcmgr")%>';
 	function $(id){ return document.getElementById(id); }
+
+	// ---- Tab 切换 ----
+	function switchTab(name){
+		var tabs = document.querySelectorAll('.fm-tab');
+		for(var i=0;i<tabs.length;i++){
+			if(tabs[i].getAttribute('data-fmtab')===name){ tabs[i].classList.add('active'); }
+			else { tabs[i].classList.remove('active'); }
+		}
+		$('tab_overview').style.display = (name==='overview') ? '' : 'none';
+		$('tab_core').style.display = (name==='core') ? '' : 'none';
+	}
 
 	// ---- 浮动提示 ----
 	function toast(msg, type, sticky){
@@ -98,6 +228,24 @@
 		return t;
 	}
 	function clearToast(t){ if(t){ t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 250); } }
+
+	// ---- 复制（兼容 http 非安全上下文：execCommand 兜底）----
+	function copyText(text){
+		if(navigator.clipboard && window.isSecureContext){
+			return navigator.clipboard.writeText(text);
+		}
+		return new Promise(function(resolve, reject){
+			try{
+				var ta = document.createElement('textarea');
+				ta.value = text;
+				ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+				document.body.appendChild(ta); ta.focus(); ta.select();
+				var ok = document.execCommand('copy');
+				document.body.removeChild(ta);
+				ok ? resolve() : reject(new Error('execCommand copy failed'));
+			}catch(e){ reject(e); }
+		});
+	}
 
 	function req(action, method, body){
 		var opt = { method: method||'GET', credentials:'same-origin' };
@@ -117,6 +265,14 @@
 	var curPort = '18080';
 	function portFromAddr(a){ if(!a) return '18080'; var m=String(a).match(/:(\d+)\s*$/); return m?m[1]:'18080'; }
 
+	function setPill(d){
+		var pill = $('fm_pill'), pt = $('fm_pilltxt');
+		pill.classList.remove('on','off','warn');
+		if(!d.has_binary){ pill.classList.add('warn'); pt.textContent = '<%:未安装核心%>'; }
+		else if(d.running){ pill.classList.add('on'); pt.textContent = '<%:运行中%>' + (d.version ? (' · ' + d.version) : ''); }
+		else { pill.classList.add('off'); pt.textContent = '<%:已停止%>'; }
+	}
+
 	function refresh(){
 		return req('info').then(function(d){
 			$('fm_arch').textContent = d.arch || '—';
@@ -127,6 +283,12 @@
 			$('fm_runstate').innerHTML = d.running
 				? '<span class="fm-badge fm-on"><%:运行中%></span>'
 				: '<span class="fm-badge fm-off"><%:已停止%></span>';
+			setPill(d);
+
+			var nobin = !d.has_binary;
+			$('fm_nobin').style.display = nobin ? 'flex' : 'none';
+			$('fm_tabdot').style.display = nobin ? 'inline-block' : 'none';
+
 			var c = d.cfg||{};
 			if(!(document.activeElement && document.activeElement.tagName==='INPUT')){
 				$('cfg_http_addr').value = c.http_addr||'';
@@ -135,13 +297,23 @@
 				$('cfg_log_level').value = c.log_level||'info';
 			}
 			curPort = portFromAddr(c.http_addr);
+
 			$('fm_start').disabled = !d.has_binary || d.running;
+			$('fm_start').title = !d.has_binary ? '<%:请先在「核心下载」页下载核心%>' : (d.running ? '<%:服务已在运行%>' : '');
 			$('fm_stop').disabled = !d.running;
+			$('fm_stop').title = !d.running ? '<%:服务未运行%>' : '';
 			$('fm_restart').disabled = !d.has_binary;
+			$('fm_restart').title = !d.has_binary ? '<%:请先下载核心%>' : '';
 			$('fm_open').disabled = !d.running;
+			$('fm_open').title = !d.running ? '<%:服务未运行，无法打开后台%>' : '';
+
 			if(!$('fm_dl').disabled || !window._dling){ $('fm_dl').disabled = !!d.downloading; }
 			return d;
-		}).catch(function(e){ toast('<%:读取状态失败：%>'+e.message, 'error'); });
+		}).catch(function(e){
+			$('fm_pill').classList.remove('on','off','warn');
+			$('fm_pilltxt').textContent = '<%:连接失败%>';
+			toast('<%:读取状态失败：%>'+e.message, 'error');
+		});
 	}
 
 	var ACT_TXT = { start:'<%:启动%>', stop:'<%:停止%>', restart:'<%:重启%>' };
@@ -165,6 +337,24 @@
 		else toast('<%:已在新标签打开后台（端口 %>'+curPort+'）', 'success');
 	}
 
+	function toggleToken(){
+		var i = $('cfg_token'), b = $('fm_tokeneye');
+		if(i.type === 'password'){ i.type = 'text'; b.innerHTML = '🙈 <%:隐藏%>'; }
+		else { i.type = 'password'; b.innerHTML = '👁 <%:显示%>'; }
+	}
+	function copyToken(btn){
+		var v = $('cfg_token').value;
+		if(!v){ toast('<%:令牌为空，无可复制内容%>', 'warn'); return; }
+		copyText(v).then(function(){ toast('✓ <%:已复制登录令牌%>', 'success'); })
+			.catch(function(){ toast('✗ <%:复制失败，请手动选择文本复制%>', 'error'); });
+	}
+	function copyLog(btn){
+		var v = $('fm_log').textContent || '';
+		if(!v.trim()){ toast('<%:暂无日志可复制%>', 'warn'); return; }
+		copyText(v).then(function(){ toast('✓ <%:已复制日志%>', 'success'); })
+			.catch(function(){ toast('✗ <%:复制失败，请手动选择文本复制%>', 'error'); });
+	}
+
 	function saveCfg(btn){
 		var t = toast('<%:正在保存并重启…%>', 'info', true);
 		busy(btn, true);
@@ -184,11 +374,17 @@
 		}).catch(function(e){ clearToast(t); busy(btn,false); toast('✗ <%:保存失败：%>'+e.message, 'error'); });
 	}
 
-	function toggleLog(){ var l=$('fm_log'); l.style.display = (l.style.display==='none'||!l.style.display)?'block':'none'; }
+	function toggleLog(){
+		var l = $('fm_log'), b = $('fm_logbtn');
+		var show = (l.style.display==='none' || !l.style.display);
+		l.style.display = show ? 'block' : 'none';
+		if(b) b.textContent = show ? '<%:隐藏日志%>' : '<%:显示日志%>';
+	}
 
 	var pollTimer = null;
 	function download(btn){
-		$('fm_log').style.display='block';
+		$('fm_log').style.display = 'block';
+		if($('fm_logbtn')) $('fm_logbtn').textContent = '<%:隐藏日志%>';
 		window._dling = true;
 		busy(btn, true, '<%:下载中…%>');
 		var t = toast('<%:开始下载核心…%>', 'info', true);
@@ -203,7 +399,7 @@
 					if(!d.running){
 						clearInterval(pollTimer); pollTimer=null;
 						window._dling = false; clearToast(t); busy(btn, false);
-						if(d.has_binary){ toast('✓ <%:核心已就绪 %>'+(d.version||''), 'success'); }
+						if(d.has_binary){ toast('✓ <%:核心已就绪 %>'+(d.version||'')+'<%:，可回「概览」页启动%>', 'success'); }
 						else { toast('✗ <%:下载失败，请看下方日志%>', 'error'); }
 						refresh();
 					}
