@@ -885,7 +885,9 @@ const Configs: React.FC = () => {
           type: t,
           secretKey: values.secretKey,
           serverName: values.serverName,
-          bindAddr: values.bindAddr || '0.0.0.0',
+          // 新建默认 0.0.0.0(表单已填); 编辑既有规则若用户清空则省略, 交 frp 兜底
+          // (空→127.0.0.1), 避免把历史空值静默改成全网卡监听。
+          bindAddr: values.bindAddr || undefined,
           bindPort: values.bindPort,
         };
         if (values.serverUser) v.serverUser = values.serverUser;
@@ -908,7 +910,8 @@ const Configs: React.FC = () => {
         const payload: Record<string, unknown> = {
           name: values.name,
           type: t,
-          localIP: values.localIP || '0.0.0.0',
+          // 同上: 新建默认 0.0.0.0; 编辑清空则省略, 交 frp 兜底, 不静默改写。
+          localIP: values.localIP || undefined,
           localPort: values.localPort,
         };
         // 通用 / TCP / UDP
@@ -983,7 +986,7 @@ const Configs: React.FC = () => {
     const edge = upper + digit;      // 首尾候选
     const all = upper + lower + digit;
     const buf = new Uint32Array(len);
-    (window.crypto || (window as any).msCrypto).getRandomValues(buf);
+    crypto.getRandomValues(buf);
     let out = '';
     for (let i = 0; i < len; i++) {
       const pool = (i === 0 || i === len - 1) ? edge : all;
@@ -1006,7 +1009,7 @@ const Configs: React.FC = () => {
         name: asCopy ? genRuleName() : proxyItem.name,
         type: proxyItem.type || 'tcp',
         // proxy / server-side 字段
-        localIP: proxyItem.localIP || '0.0.0.0',
+        localIP: proxyItem.localIP || '',
         localPort: proxyItem.localPort,
         remotePort: proxyItem.remotePort,
         customDomains: proxyItem.customDomains ? proxyItem.customDomains.join(',') : '',
@@ -1027,7 +1030,7 @@ const Configs: React.FC = () => {
         // visitor 字段
         serverName: proxyItem.serverName,
         serverUser: proxyItem.serverUser,
-        bindAddr: proxyItem.bindAddr || '0.0.0.0',
+        bindAddr: proxyItem.bindAddr || '',
         bindPort: proxyItem.bindPort,
         useEncryption: proxyItem.transport?.useEncryption ?? false,
         useCompression: proxyItem.transport?.useCompression ?? false,
@@ -1458,7 +1461,7 @@ const Configs: React.FC = () => {
                               title: '本地 / 绑定',
                               render: (_, record) => {
                                 if (record._kind === 'visitor') {
-                                  return <Text type="secondary">{record.bindAddr || '0.0.0.0'}:{record.bindPort ?? '-'}</Text>;
+                                  return <Text type="secondary">{record.bindAddr || '127.0.0.1'}:{record.bindPort ?? '-'}</Text>;
                                 }
                                 return (
                                   <Text type="secondary">
@@ -2246,7 +2249,7 @@ const Configs: React.FC = () => {
                   </Row>
                   <Row gutter={12}>
                     <Col span={14}>
-                      <Form.Item label="本地绑定地址 bindAddr" name="bindAddr" initialValue="0.0.0.0">
+                      <Form.Item label="本地绑定地址 bindAddr" name="bindAddr" tooltip="留空=frp 默认 127.0.0.1(仅回环); 0.0.0.0=所有网卡(LAN 可达)">
                         <Input placeholder="0.0.0.0" />
                       </Form.Item>
                     </Col>
@@ -2329,7 +2332,7 @@ const Configs: React.FC = () => {
               const usingPlugin = !!getFieldValue('pluginName');
               return (
                 <>
-                  <Form.Item label="本地监听 IP" name="localIP" initialValue="0.0.0.0">
+                  <Form.Item label="本地监听 IP" name="localIP" tooltip="留空=frp 默认 127.0.0.1">
                     <Input placeholder="0.0.0.0" disabled={usingPlugin} />
                   </Form.Item>
                   <Form.Item

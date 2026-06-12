@@ -11,9 +11,21 @@ import (
 	"github.com/mia-clark/frpc-manager/pkg/config"
 )
 
-// checkVisitorConflict guards visitor create/update against a cross-instance
-// local-port collision: another instance's visitor of the same protocol family
-// (STCP/XTCP=TCP, SUDP=UDP) already listening on the same bindAddr:bindPort.
+// writeVisitorConflict renders a 409 visitor_port_conflict response from a
+// detected conflict, with a human-readable Chinese message plus machine details.
+func writeVisitorConflict(w http.ResponseWriter, c *manager.VisitorConflict) {
+	WriteError(w, http.StatusConflict, CodeVisitorPortConflict,
+		fmt.Sprintf("本地端口 %s:%d 已被实例「%s」的访客「%s」(%s) 占用，无法保存；同协议族(TCP/UDP)的访客不能复用同一本地端口",
+			c.BindAddr, c.BindPort, c.ConfigName, c.Name, strings.ToUpper(c.Type)),
+		map[string]any{
+			"config_id": c.ConfigID, "config_name": c.ConfigName,
+			"name": c.Name, "type": c.Type, "bind_addr": c.BindAddr, "bind_port": c.BindPort,
+		})
+}
+
+// checkVisitorConflict guards a single visitor create/update against a local-
+// port collision with ANY instance's visitor (including this config) of the
+// same protocol family (STCP/XTCP=TCP, SUDP=UDP) on the same bindAddr:bindPort.
 // excludeName is the visitor being edited (skipped on its own instance) or ""
 // on create. Returns true (and writes a 409) when a conflict was found.
 func (h *ProxiesHandler) checkVisitorConflict(w http.ResponseWriter, id, excludeName string, v *config.TypedVisitorConfig) bool {
@@ -25,13 +37,7 @@ func (h *ProxiesHandler) checkVisitorConflict(w http.ResponseWriter, id, exclude
 	if c == nil {
 		return false
 	}
-	WriteError(w, http.StatusConflict, CodeVisitorPortConflict,
-		fmt.Sprintf("本地端口 %s:%d 已被实例「%s」的访客「%s」(%s) 占用，无法保存；同协议族(TCP/UDP)的访客不能复用同一本地端口",
-			c.BindAddr, c.BindPort, c.ConfigName, c.Name, strings.ToUpper(c.Type)),
-		map[string]any{
-			"config_id": c.ConfigID, "config_name": c.ConfigName,
-			"name": c.Name, "type": c.Type, "bind_addr": c.BindAddr, "bind_port": c.BindPort,
-		})
+	writeVisitorConflict(w, c)
 	return true
 }
 

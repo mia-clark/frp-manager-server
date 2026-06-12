@@ -419,9 +419,14 @@ func visitorProto(t string) string {
 	}
 }
 
+// normBindAddr resolves an empty bind address to frp's actual default for a
+// visitor listener: 127.0.0.1 (loopback only), NOT 0.0.0.0. frp v0.69.1
+// pkg/config/v1/visitor.go fills an empty BindAddr with 127.0.0.1, so an empty
+// value must not be treated as a wildcard (that would falsely collide with a
+// specific LAN IP on the same port).
 func normBindAddr(a string) string {
 	if a = strings.TrimSpace(a); a == "" {
-		return "0.0.0.0"
+		return "127.0.0.1"
 	}
 	return a
 }
@@ -429,27 +434,28 @@ func normBindAddr(a string) string {
 func isWildcardAddr(a string) bool { return a == "0.0.0.0" || a == "::" || a == "*" }
 
 // addrsOverlap reports whether two bind addresses on the same port collide.
-// A wildcard (0.0.0.0 / :: / empty) binds every interface so it overlaps any
+// A wildcard (0.0.0.0 / :: / *) binds every interface so it overlaps any
 // address; two distinct specific addresses do not collide.
+//
+// Limitations (this is a best-effort pre-check; frp's own net.Listen is the
+// final authority at start time): comparison is literal — a hostname and an
+// equivalent IP ("localhost" vs "127.0.0.1") are not recognized as the same
+// (false negative), and IPv4 0.0.0.0 is treated as overlapping any address
+// including IPv6-only ones (rare false positive). Both are fail-safe-ish given
+// the UI now defaults every bind address to 0.0.0.0.
 func addrsOverlap(a, b string) bool {
 	a, b = normBindAddr(a), normBindAddr(b)
 	return a == b || isWildcardAddr(a) || isWildcardAddr(b)
 }
 
-// VisitorBindConflict scans every instance's visitors for one whose local
-// listener would collide with the candidate (same protocol family + bindPort +
-// overlapping bindAddr), excluding the visitor identified by excludeID +
-// excludeName (the one being edited). bindPort <= 0 means "no local listener"
-// and never conflicts. Returns nil when there is no conflict.
-func (m *Manager) VisitorBindConflict(excludeID, excludeName, vType, bindAddr string, bindPort int) *VisitorConflict {
-	if bindPort <= 0 {
+// visitorScan returns the first existing visitor (across all instances) whose
+// local listener collides with proto+bindPort+bindAddr and for which
+// skip(configID, visitorName) is false. Instances are visited in id order so
+// the reported conflict is deterministic when several would match.
+func (m *Manager) visitorScan(proto string, bindPort int, bindAddr string, skip func(id, name string) bool) *VisitorConflict {
+	if proto == "" || bindPort <= 0 {
 		return nil
 	}
-	proto := visitorProto(vType)
-	if proto == "" {
-		return nil
-	}
-
 	type pair struct {
 		id   string
 		inst *instance
@@ -460,6 +466,7 @@ func (m *Manager) VisitorBindConflict(excludeID, excludeName, vType, bindAddr st
 		pairs = append(pairs, pair{id, inst})
 	}
 	m.mu.RUnlock()
+	sort.Slice(pairs, func(i, j int) bool { return pairs[i].id < pairs[j].id })
 
 	for _, pr := range pairs {
 		data := pr.inst.Data()
@@ -467,13 +474,10 @@ func (m *Manager) VisitorBindConflict(excludeID, excludeName, vType, bindAddr st
 			continue
 		}
 		for _, p := range data.Proxies {
-			if !p.IsVisitor() || p.BindPort != bindPort {
+			if !p.IsVisitor() || p.BindPort != bindPort || visitorProto(p.Type) != proto {
 				continue
 			}
-			if pr.id == excludeID && p.Name == excludeName {
-				continue
-			}
-			if visitorProto(p.Type) != proto || !addrsOverlap(p.BindAddr, bindAddr) {
+			if skip(pr.id, p.Name) || !addrsOverlap(p.BindAddr, bindAddr) {
 				continue
 			}
 			name := data.Name()
@@ -485,6 +489,62 @@ func (m *Manager) VisitorBindConflict(excludeID, excludeName, vType, bindAddr st
 				Type: p.Type, BindAddr: normBindAddr(p.BindAddr), BindPort: p.BindPort,
 			}
 		}
+	}
+	return nil
+}
+
+// VisitorBindConflict scans every instance's visitors (including this config)
+// for one whose local listener would collide with the candidate (same protocol
+// family + bindPort + overlapping bindAddr), excluding only the single visitor
+// identified by excludeID+excludeName (the one being edited). bindPort <= 0
+// means "no local listener" and never conflicts.
+func (m *Manager) VisitorBindConflict(excludeID, excludeName, vType, bindAddr string, bindPort int) *VisitorConflict {
+	return m.visitorScan(visitorProto(vType), bindPort, bindAddr, func(id, name string) bool {
+		return id == excludeID && name == excludeName
+	})
+}
+
+// ValidateVisitorBinds checks every visitor in data (the config about to be
+// saved under id) for a local-port conflict — against any OTHER instance's
+// visitors, and against earlier visitors within data itself. The whole config
+// id is excluded from the cross-instance scan because data replaces it. Used by
+// the full-config / raw-TOML save paths so a hand-authored conflict is caught
+// before it is persisted. Returns the first conflict or nil.
+func (m *Manager) ValidateVisitorBinds(id string, data *config.ClientConfig) *VisitorConflict {
+	if data == nil {
+		return nil
+	}
+	type vb struct {
+		name, vtype, addr, proto string
+		port                     int
+	}
+	var seen []vb
+	for _, p := range data.Proxies {
+		if !p.IsVisitor() {
+			continue
+		}
+		proto := visitorProto(p.Type)
+		if proto == "" || p.BindPort <= 0 {
+			continue
+		}
+		// against other instances (the whole config id is being replaced)
+		if c := m.visitorScan(proto, p.BindPort, p.BindAddr, func(cid, _ string) bool { return cid == id }); c != nil {
+			return c
+		}
+		// against earlier visitors in this same incoming config
+		for _, s := range seen {
+			if s.proto == proto && s.port == p.BindPort && addrsOverlap(s.addr, p.BindAddr) {
+				nm := data.Name()
+				if nm == "" {
+					nm = id
+				}
+				return &VisitorConflict{
+					ConfigID: id, ConfigName: nm, Name: s.name,
+					Type: s.vtype, BindAddr: normBindAddr(s.addr), BindPort: s.port,
+				}
+			}
+		}
+		seen = append(seen, vb{p.Name, p.Type, p.BindAddr, proto, p.BindPort})
 	}
 	return nil
 }

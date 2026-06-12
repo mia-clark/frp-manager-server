@@ -25,8 +25,9 @@ const (
 	CodeProxyNotFound   ErrorCode = "proxy_not_found"
 	CodeProxyExists     ErrorCode = "proxy_already_exists"
 	CodeUpstreamFailure ErrorCode = "upstream_failure"
-	// CodeVisitorPortConflict means another instance's visitor of the same
-	// protocol family already listens on the same bindAddr:bindPort.
+	// CodeVisitorPortConflict means an existing visitor (in any instance,
+	// including the same config) of the same protocol family already listens
+	// on the same bindAddr:bindPort.
 	CodeVisitorPortConflict ErrorCode = "visitor_port_conflict"
 )
 

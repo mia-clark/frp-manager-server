@@ -52,6 +52,13 @@ frp 对 secretKey 无格式要求（任意字符串作为共享密钥）。
     `{ConfigID, ConfigName, Name, Type, BindAddr, BindPort}`。
 - `proxies.go` 的 `Create` / `Update`：当 `req.Visitor != nil` 时调用上面校验
   （Update 排除自身），命中返回 `409 visitor_port_conflict` + `details`，消息中文可读。
+- `manager.ValidateVisitorBinds(id, data)`：对整份待存 config 的每个访客校验——既比对
+  其它实例（排除整个 id），也比对该 config 内更早的访客（同 config 内重复）。接入
+  `ConfigsHandler.Update`（PUT 整 config）与 `PutRaw`（原始 TOML 编辑器），覆盖表单
+  之外的交互式写入路径。**导入路径刻意放行**（备份还原完整度优先，冲突运行时暴露）。
+- 注: 空 `bindAddr` 归一化为 frp 真实默认 `127.0.0.1`（loopback），不当通配；地址比较
+  为字面比较（best-effort 预检），不解析 hostname；扫描按 config id 排序，多冲突时
+  报出者稳定。
 
 ### 2. 前端：默认 IP → `0.0.0.0`
 

@@ -64,6 +64,52 @@ func TestVisitorBindConflict(t *testing.T) {
 	}
 }
 
+func twoVisitorCfg(n1, t1, a1 string, p1 int, n2, t2, a2 string, p2 int) *config.ClientConfig {
+	c := config.NewDefaultClientConfig()
+	for _, v := range []struct {
+		n, t, a string
+		p       int
+	}{{n1, t1, a1, p1}, {n2, t2, a2, p2}} {
+		c.Proxies = append(c.Proxies, &config.Proxy{
+			BaseProxyConf: config.BaseProxyConf{Name: v.n, Type: v.t},
+			Role:          "visitor", ServerName: "s-" + v.n, SK: "k", BindAddr: v.a, BindPort: v.p,
+		})
+	}
+	return c
+}
+
+// ValidateVisitorBinds 覆盖整 config 保存路径: 跨实例冲突、排除被替换 config 自身、
+// 同 config 内端口重复、空 bindAddr 归一 127.0.0.1。
+func TestValidateVisitorBinds(t *testing.T) {
+	m := newImportTestManager(t)
+	if err := m.Create("other", visitorCfg("ov", "stcp", "0.0.0.0", 30000)); err != nil {
+		t.Fatalf("create other: %v", err)
+	}
+
+	// (1) 跨实例: 新 config 的 xtcp 访客撞 other 的 stcp(都 TCP)
+	if c := m.ValidateVisitorBinds("new", visitorCfg("v", "xtcp", "0.0.0.0", 30000)); c == nil || c.ConfigID != "other" {
+		t.Fatalf("跨实例冲突未检出: %+v", c)
+	}
+
+	// (2) 排除整个被替换的 config: 替换 other 自身、同端口, 不应与旧值冲突
+	if c := m.ValidateVisitorBinds("other", visitorCfg("ov2", "stcp", "0.0.0.0", 30000)); c != nil {
+		t.Fatalf("替换自身 config 不应与旧值冲突: %+v", c)
+	}
+
+	// (3) 同 config 内两访客撞端口(stcp + xtcp 同 TCP)
+	if c := m.ValidateVisitorBinds("dup", twoVisitorCfg("a", "stcp", "0.0.0.0", 40000, "b", "xtcp", "0.0.0.0", 40000)); c == nil || c.Name != "a" {
+		t.Fatalf("同 config 内端口重复未检出: %+v", c)
+	}
+
+	// (4) 空 bindAddr 归一 127.0.0.1, 不与具体 LAN IP(192.168.1.9) 冲突
+	if err := m.Create("lan", visitorCfg("lv", "stcp", "192.168.1.9", 50000)); err != nil {
+		t.Fatalf("create lan: %v", err)
+	}
+	if c := m.ValidateVisitorBinds("ec", visitorCfg("ev", "stcp", "", 50000)); c != nil {
+		t.Fatalf("空 bindAddr(→127.0.0.1) 不应与 192.168.1.9 冲突: %+v", c)
+	}
+}
+
 // 两个不同的具体 IP 同端口同协议 → 不冲突（绑不同网卡）。
 func TestVisitorBindConflict_DistinctSpecificIPs(t *testing.T) {
 	m := newImportTestManager(t)

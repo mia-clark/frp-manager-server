@@ -81,6 +81,10 @@ func (h *ConfigsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := fromV1(body.Config)
+	if c := h.m.ValidateVisitorBinds(id, data); c != nil {
+		writeVisitorConflict(w, c)
+		return
+	}
 	if err := h.m.Update(id, data); writeManagerError(w, err) {
 		return
 	}
@@ -179,6 +183,14 @@ func (h *ConfigsHandler) PutRaw(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, CodeBadRequest, "read body: "+err.Error(), nil)
 		return
+	}
+	// Catch a hand-authored visitor port conflict before persisting. Parse
+	// errors are left for WriteRaw to report (it re-parses and validates).
+	if parsed, perr := config.UnmarshalClientConf(body); perr == nil {
+		if c := h.m.ValidateVisitorBinds(id, parsed); c != nil {
+			writeVisitorConflict(w, c)
+			return
+		}
 	}
 	if err := h.m.WriteRaw(id, body); writeManagerError(w, err) {
 		return
