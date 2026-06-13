@@ -2,6 +2,7 @@ package appcfg
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -67,6 +68,21 @@ func getEnv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// ParseLevel maps a level name (trace|debug|info|warn|error) to slog.Level.
+// Shared by the daemon bootstrap and the runtime log-level switch so both agree.
+func ParseLevel(s string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "trace", "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
 
 func parseBool(s string, def bool) bool {

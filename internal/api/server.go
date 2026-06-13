@@ -19,6 +19,9 @@ type Deps struct {
 	Cfg     *appcfg.Config
 	Logger  *slog.Logger
 	Manager *manager.Manager
+	// LogLevel is the live logger level knob, so the runtime system-config
+	// endpoint can change verbosity without a restart. May be nil.
+	LogLevel *slog.LevelVar
 }
 
 // NewRouter assembles the chi mux with all middleware and route groups
@@ -26,36 +29,40 @@ type Deps struct {
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
 
+	// Runtime config: env defaults overlaid with meta.json overrides, read live
+	// by CORS / docs / self-update so a system-config UI change applies at once.
+	rc := NewRuntimeConfig(d.Cfg, d.Manager, d.LogLevel)
+
 	r.Use(middleware.Recover(d.Logger))
 	r.Use(middleware.AccessLog(d.Logger))
-	r.Use(middleware.CORS(d.Cfg.CORSOrigins))
+	r.Use(middleware.CORS(rc.EffectiveCORS))
 
 	sys := NewSystemHandler(d.Cfg.DataDir)
-	docs := NewDocsHandler(d.Cfg.DocsEnabled)
+	docs := NewDocsHandler(rc.DocsEnabled)
 	ui := NewUIHandler(d.Manager)
 
-	// Unauthenticated probes + docs.
+	// Unauthenticated probes + docs. The docs routes are always mounted; each
+	// handler 404s per-request when docs are disabled, so the toggle is live.
 	r.Get("/api/v1/health", sys.Health)
 	// UI branding is read without auth so the login page + browser <title>
 	// can render the custom values before the user is authenticated.
 	r.Get("/api/v1/ui/branding", ui.GetBranding)
-	if docs.Enabled() {
-		r.Get("/api/docs", docs.Redirect)
-		r.Get("/api/docs/", docs.UI)
-		r.Get("/api/docs/openapi.yaml", docs.Spec)
-		r.Get("/api/docs/openapi.json", docs.SpecJSON)
-	}
+	r.Get("/api/docs", docs.Redirect)
+	r.Get("/api/docs/", docs.UI)
+	r.Get("/api/docs/openapi.yaml", docs.Spec)
+	r.Get("/api/docs/openapi.json", docs.SpecJSON)
 
 	configs := NewConfigsHandler(d.Manager, d.Logger)
 	proxies := NewProxiesHandler(d.Manager, d.Logger)
 	life := NewLifecycleHandler(d.Manager, d.Logger)
 	status := NewStatusHandler(d.Manager)
 	validate := NewValidateHandler()
-	events := NewEventsHandler(d.Manager, d.Logger, d.Cfg.CORSOrigins)
-	logs := NewLogsHandler(d.Manager, d.Cfg.LogsDir, d.Logger, d.Cfg.CORSOrigins)
+	events := NewEventsHandler(d.Manager, d.Logger, rc.EffectiveCORS)
+	logs := NewLogsHandler(d.Manager, d.Cfg.LogsDir, d.Logger, rc.EffectiveCORS)
 	imex := NewImportExportHandler(d.Manager, d.Logger)
 	nat := NewNatholeHandler()
-	upd := NewUpdateHandler(d.Cfg.DataDir, d.Cfg.SelfUpdateEnabled, d.Logger)
+	upd := NewUpdateHandler(d.Cfg.DataDir, rc.SelfUpdateEnabled, d.Logger)
+	syscfg := NewSysConfigHandler(rc, d.Logger)
 
 	// Authenticated subtree.
 	r.Group(func(r chi.Router) {
@@ -64,6 +71,8 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/api/v1/version/check", upd.Check)
 		r.Post("/api/v1/system/update", upd.Update)
 		r.Get("/api/v1/system/update/log", upd.Log)
+		r.Get("/api/v1/system/config", syscfg.Get)
+		r.Put("/api/v1/system/config", syscfg.Put)
 
 		r.Put("/api/v1/ui/branding", ui.UpdateBranding)
 

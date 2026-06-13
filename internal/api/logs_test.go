@@ -43,7 +43,7 @@ func TestLogsQuery_FiltersByInstancePrefix(t *testing.T) {
 	mustCreateInstance(t, m, "A")
 	mustCreateInstance(t, m, "B")
 
-	h := NewLogsHandler(m, logsDir, testLogger(), []string{"*"})
+	h := NewLogsHandler(m, logsDir, testLogger(), func() []string { return []string{"*"} })
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/configs/A/logs?lines=10", nil)
 	req = withPathID(req, "A")
@@ -131,7 +131,7 @@ func TestLogsTail_FiltersByInstancePrefix(t *testing.T) {
 	mustCreateInstance(t, m, "A")
 	mustCreateInstance(t, m, "B")
 
-	h := NewLogsHandler(m, logsDir, testLogger(), []string{"*"})
+	h := NewLogsHandler(m, logsDir, testLogger(), func() []string { return []string{"*"} })
 
 	// httptest.Server + ws Dial
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -222,7 +222,7 @@ func TestLogsClear_SetsViewSince(t *testing.T) {
 	m := newTestManager(t, tmp)
 	mustCreateInstance(t, m, "A")
 	mustCreateInstance(t, m, "B")
-	h := NewLogsHandler(m, logsDir, testLogger(), []string{"*"})
+	h := NewLogsHandler(m, logsDir, testLogger(), func() []string { return []string{"*"} })
 
 	// 1. Clear A
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/configs/A/logs", nil)
@@ -274,7 +274,7 @@ func TestLogsClear_404OnUnknownID(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	m := newTestManager(t, tmp)
-	h := NewLogsHandler(m, logsDir, testLogger(), []string{"*"})
+	h := NewLogsHandler(m, logsDir, testLogger(), func() []string { return []string{"*"} })
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/v1/configs/nonexistent/logs", nil)
 	req = withPathID(req, "nonexistent")
@@ -306,7 +306,7 @@ func TestLogsQuery_RespectsViewSince(t *testing.T) {
 
 	m := newTestManager(t, tmp)
 	mustCreateInstance(t, m, "A")
-	h := NewLogsHandler(m, logsDir, testLogger(), []string{"*"})
+	h := NewLogsHandler(m, logsDir, testLogger(), func() []string { return []string{"*"} })
 
 	// Set view-since to 13:00:00 — only line-3 (14:00) should survive
 	cutoff, err := time.ParseInLocation("2006-01-02 15:04:05.000",

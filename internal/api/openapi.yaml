@@ -116,6 +116,39 @@ paths:
         each time POST /system/update starts. body { content: string }.
       responses:
         '200': { description: 'OK — body { content: string }' }
+  /api/v1/system/config:
+    get:
+      tags: [system]
+      summary: Read runtime daemon settings (env defaults + meta overrides)
+      description: >
+        Returns { effective, env_default, overridden } for log_level,
+        self_update_enabled, docs_enabled, cors_origins. effective = env default
+        overlaid with the operator's meta.json overrides.
+      responses:
+        '200': { description: OK }
+    put:
+      tags: [system]
+      summary: Update runtime daemon settings (applies live, no restart)
+      description: >
+        Each provided field sets/replaces that override; a field name in "reset"
+        clears it back to the env default. log_level change re-applies to the
+        live logger; docs/self-update/CORS are read per-request. Persisted to
+        meta.json so it survives restarts.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                log_level: { type: string, enum: [trace, debug, info, warn, error] }
+                self_update_enabled: { type: boolean }
+                docs_enabled: { type: boolean }
+                cors_origins: { type: array, items: { type: string } }
+                reset: { type: array, items: { type: string, enum: [log_level, self_update_enabled, docs_enabled, cors_origins] } }
+      responses:
+        '200': { description: 'OK — same shape as GET' }
+        '400': { description: Invalid log_level or empty cors_origins }
   /api/v1/configs:
     get:
       tags: [configs]
@@ -437,9 +470,10 @@ paths:
       summary: Import a ZIP backup
       description: >
         Restores configs from the archive's *.toml/*.ini/*.conf. If the archive
-        contains meta.json (produced by /export/all), the operator branding and
-        the instance display order are re-applied too; response.branding_restored
-        / order_restored report whether each was.
+        contains meta.json (produced by /export/all), the operator branding, the
+        instance display order and the runtime system_config overrides (log level
+        / self-update / docs / CORS) are re-applied too; response.branding_restored
+        / order_restored / system_config_restored report whether each was.
       requestBody:
         required: true
         content:
@@ -449,7 +483,7 @@ paths:
               properties:
                 file: { type: string, format: binary }
       responses:
-        '200': { description: 'OK — body { imported: string[], branding_restored: boolean, order_restored: boolean }' }
+        '200': { description: 'OK — body { imported: string[], branding_restored: boolean, order_restored: boolean, system_config_restored: boolean }' }
   /api/v1/configs/{id}/export:
     get:
       tags: [import-export]

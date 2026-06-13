@@ -158,17 +158,18 @@ func (h *ImportExportHandler) ImportZIP(w http.ResponseWriter, r *http.Request) 
 		imported = append(imported, id)
 	}
 
-	brandingRestored, orderRestored := false, false
+	brandingRestored, orderRestored, systemConfigRestored := false, false, false
 	if len(metaRaw) > 0 {
 		var err error
-		if brandingRestored, orderRestored, err = h.m.ImportMeta(metaRaw); err != nil {
+		if brandingRestored, orderRestored, systemConfigRestored, err = h.m.ImportMeta(metaRaw); err != nil {
 			h.log.Warn("restore meta from import failed", slog.Any("err", err))
 		}
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{
-		"imported":          imported,
-		"branding_restored": brandingRestored,
-		"order_restored":    orderRestored,
+		"imported":               imported,
+		"branding_restored":      brandingRestored,
+		"order_restored":         orderRestored,
+		"system_config_restored": systemConfigRestored,
 	})
 }
 

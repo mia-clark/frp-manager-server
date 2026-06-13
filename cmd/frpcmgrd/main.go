@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -76,7 +75,11 @@ func runServe(args []string) int {
 		return 1
 	}
 
-	logger := newLogger(cfg.LogLevel)
+	// Use a LevelVar so the running level can be changed at runtime via the
+	// system-config UI (FRPCMGR_LOG_LEVEL is the boot default).
+	levelVar := new(slog.LevelVar)
+	levelVar.Set(appcfg.ParseLevel(cfg.LogLevel))
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: levelVar}))
 	logger.Info("starting frpcmgrd",
 		slog.String("addr", cfg.HTTPAddr),
 		slog.String("data_dir", cfg.DataDir),
@@ -108,7 +111,7 @@ func runServe(args []string) int {
 	mgr.AutoStart()
 	defer mgr.Shutdown()
 
-	handler := api.NewRouter(api.Deps{Cfg: cfg, Logger: logger, Manager: mgr})
+	handler := api.NewRouter(api.Deps{Cfg: cfg, Logger: logger, Manager: mgr, LogLevel: levelVar})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           handler,
@@ -162,17 +165,3 @@ func runHealth(args []string) int {
 	return 0
 }
 
-func newLogger(level string) *slog.Logger {
-	var lv slog.Level
-	switch strings.ToLower(level) {
-	case "trace", "debug":
-		lv = slog.LevelDebug
-	case "warn":
-		lv = slog.LevelWarn
-	case "error":
-		lv = slog.LevelError
-	default:
-		lv = slog.LevelInfo
-	}
-	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lv}))
-}

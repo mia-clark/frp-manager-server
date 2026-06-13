@@ -662,6 +662,25 @@ func (m *Manager) SetLogViewSince(id string, unixMilli int64) error {
 	return m.meta.setLogViewSince(id, unixMilli)
 }
 
+// GetSystemConfig returns the raw stored system-config overrides (nil fields
+// mean "use the env default"). The API layer merges these with appcfg.
+func (m *Manager) GetSystemConfig() SystemConfig {
+	return m.meta.systemConfig()
+}
+
+// SetSystemConfig persists the system-config overrides wholesale.
+func (m *Manager) SetSystemConfig(c SystemConfig) error {
+	return m.meta.setSystemConfig(c)
+}
+
+// UpdateSystemConfig atomically merges the overrides under the store lock via
+// the apply callback, so a partial PUT (some fields set, some reset) can't race
+// another concurrent update and lose fields. apply mutates a clone of the
+// current overrides in place; nil fields mean "follow the env default".
+func (m *Manager) UpdateSystemConfig(apply func(*SystemConfig)) error {
+	return m.meta.updateSystemConfig(apply)
+}
+
 // GetBranding returns the effective UI branding — stored overrides with the
 // Default* constants filled in for any empty field, so callers always get a
 // ready-to-render value.
@@ -695,13 +714,17 @@ func (m *Manager) SetBranding(in Branding) (Branding, error) {
 // It deliberately ignores log_view_since / auto_start (transient/legacy). Sort
 // is restored because preserving the instance order across an export→import to
 // another host is an explicit goal; Reorder keeps only ids that exist now, and
-// any imported config not listed in the backup sort falls to the end.
+// any imported config not listed in the backup sort falls to the end. The
+// system_config overrides (log level / self-update / docs / CORS) are restored
+// too, so a backup carries the operator's full customization; self-update/docs/
+// CORS take effect immediately (read live per-request) while a restored log
+// level applies on the next restart (re-armed by NewRuntimeConfig).
 //
-// Returns whether a non-empty branding and a non-empty order were applied.
-func (m *Manager) ImportMeta(raw []byte) (brandingRestored, orderRestored bool, err error) {
+// Returns whether a non-empty branding, order, and system_config were applied.
+func (m *Manager) ImportMeta(raw []byte) (brandingRestored, orderRestored, systemConfigRestored bool, err error) {
 	var meta Meta
 	if err := json.Unmarshal(raw, &meta); err != nil {
-		return false, false, err
+		return false, false, false, err
 	}
 	// Branding and order are restored independently: a failure on one is
 	// recorded but never blocks the other (first error is returned).
@@ -726,7 +749,21 @@ func (m *Manager) ImportMeta(raw []byte) (brandingRestored, orderRestored bool, 
 			orderRestored = true
 		}
 	}
-	return brandingRestored, orderRestored, err
+	// Restore runtime overrides only when at least one field is actually set;
+	// an all-nil SystemConfig carries no customization worth reporting. The
+	// values came from this app's validated PUT, and the read-side getters still
+	// normalize (e.g. empty CORS → follow env), so we trust them as-is.
+	if sc := meta.SystemConfig; sc != nil &&
+		(sc.LogLevel != nil || sc.SelfUpdateEnabled != nil || sc.DocsEnabled != nil || sc.CORSOrigins != nil) {
+		if e := m.SetSystemConfig(*sc); e != nil {
+			if err == nil {
+				err = e
+			}
+		} else {
+			systemConfigRestored = true
+		}
+	}
+	return brandingRestored, orderRestored, systemConfigRestored, err
 }
 
 // truncateRunes caps s to at most max runes (not bytes), so multi-byte CJK
