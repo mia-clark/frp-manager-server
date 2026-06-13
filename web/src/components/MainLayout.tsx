@@ -8,6 +8,7 @@ import {
   ToolOutlined,
   SettingOutlined,
   SwapOutlined,
+  CloudUploadOutlined,
   PoweroffOutlined,
   SafetyCertificateOutlined,
   ApiOutlined,
@@ -123,6 +124,7 @@ const MainLayout: React.FC = () => {
           { key: '/tools/nat', icon: <ApiOutlined />, label: 'NAT 探测' },
           { key: '/tools/reference', icon: <BookOutlined />, label: 'TOML 参考' },
           { key: '/import-export', icon: <SwapOutlined />, label: '导入 / 导出' },
+          { key: '/backup', icon: <CloudUploadOutlined />, label: '定时备份' },
         ],
       },
       {

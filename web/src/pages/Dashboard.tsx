@@ -54,6 +54,7 @@ const TYPE_BADGE: Record<EventType, { color: string; label: string }> = {
   'config.changed': { color: 'gold', label: '配置变更' },
   'config.deleted': { color: 'volcano', label: '配置删除' },
   'log.line': { color: 'default', label: '日志' },
+  'backup.run': { color: 'purple', label: '定时备份' },
 };
 
 function fmtBytes(n?: number): string {

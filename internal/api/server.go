@@ -10,6 +10,7 @@ import (
 
 	"github.com/mia-clark/frpc-manager/internal/api/middleware"
 	"github.com/mia-clark/frpc-manager/internal/appcfg"
+	"github.com/mia-clark/frpc-manager/internal/backup"
 	"github.com/mia-clark/frpc-manager/internal/manager"
 	"github.com/mia-clark/frpc-manager/web"
 )
@@ -22,6 +23,9 @@ type Deps struct {
 	// LogLevel is the live logger level knob, so the runtime system-config
 	// endpoint can change verbosity without a restart. May be nil.
 	LogLevel *slog.LevelVar
+	// Backup is the scheduled-backup engine. Handlers reload it after config
+	// changes so edits take effect without a restart. May be nil (tests).
+	Backup *backup.Scheduler
 }
 
 // NewRouter assembles the chi mux with all middleware and route groups
@@ -59,10 +63,11 @@ func NewRouter(d Deps) http.Handler {
 	validate := NewValidateHandler()
 	events := NewEventsHandler(d.Manager, d.Logger, rc.EffectiveCORS)
 	logs := NewLogsHandler(d.Manager, d.Cfg.LogsDir, d.Logger, rc.EffectiveCORS)
-	imex := NewImportExportHandler(d.Manager, d.Logger)
+	imex := NewImportExportHandler(d.Manager, d.Logger, d.Backup)
 	nat := NewNatholeHandler()
 	upd := NewUpdateHandler(d.Cfg.DataDir, rc.SelfUpdateEnabled, d.Logger)
 	syscfg := NewSysConfigHandler(rc, d.Logger)
+	bkp := NewBackupHandler(d.Manager, d.Backup, d.Logger)
 
 	// Authenticated subtree.
 	r.Group(func(r chi.Router) {
@@ -73,6 +78,21 @@ func NewRouter(d Deps) http.Handler {
 		r.Get("/api/v1/system/update/log", upd.Log)
 		r.Get("/api/v1/system/config", syscfg.Get)
 		r.Put("/api/v1/system/config", syscfg.Put)
+
+		// Scheduled backup: storage channels, schedules, run history.
+		r.Get("/api/v1/backup/channels", bkp.ListChannels)
+		r.Post("/api/v1/backup/channels", bkp.CreateChannel)
+		r.Post("/api/v1/backup/channels/test", bkp.TestChannelConfig)
+		r.Put("/api/v1/backup/channels/{id}", bkp.UpdateChannel)
+		r.Delete("/api/v1/backup/channels/{id}", bkp.DeleteChannel)
+		r.Post("/api/v1/backup/channels/{id}/test", bkp.TestChannel)
+		r.Get("/api/v1/backup/schedules", bkp.ListSchedules)
+		r.Post("/api/v1/backup/schedules", bkp.CreateSchedule)
+		r.Put("/api/v1/backup/schedules/{id}", bkp.UpdateSchedule)
+		r.Delete("/api/v1/backup/schedules/{id}", bkp.DeleteSchedule)
+		r.Post("/api/v1/backup/schedules/{id}/toggle", bkp.ToggleSchedule)
+		r.Post("/api/v1/backup/schedules/{id}/run", bkp.RunSchedule)
+		r.Get("/api/v1/backup/runs", bkp.ListRuns)
 
 		r.Put("/api/v1/ui/branding", ui.UpdateBranding)
 

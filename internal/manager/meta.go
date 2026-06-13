@@ -7,6 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/mia-clark/frpc-manager/internal/backup"
 )
 
 // Meta is the persisted daemon-level metadata stored at /data/meta.json.
@@ -25,6 +28,25 @@ type Meta struct {
 	// SystemConfig holds operator overrides for runtime daemon settings,
 	// layered on top of the FRPCMGR_* env defaults. nil fields use the env value.
 	SystemConfig *SystemConfig `json:"system_config,omitempty"`
+	// Backup holds the scheduled-backup configuration: storage channels,
+	// schedules and a rolling run history. Persisted so it survives restart /
+	// update; channels+schedules also travel with /export/all backups.
+	Backup *BackupData `json:"backup,omitempty"`
+}
+
+// BackupData is the persisted scheduled-backup state.
+type BackupData struct {
+	Channels  []backup.Channel   `json:"channels,omitempty"`
+	Schedules []backup.Schedule  `json:"schedules,omitempty"`
+	Runs      []backup.RunRecord `json:"runs,omitempty"`
+}
+
+func cloneBackupData(b BackupData) BackupData {
+	return BackupData{
+		Channels:  backup.CloneChannels(b.Channels),
+		Schedules: backup.CloneSchedules(b.Schedules),
+		Runs:      backup.CloneRuns(b.Runs),
+	}
 }
 
 // SystemConfig holds operator overrides for runtime daemon settings, persisted
@@ -154,6 +176,10 @@ func (s *metaStore) snapshot() Meta {
 		c := cloneSystemConfig(*s.data.SystemConfig)
 		m.SystemConfig = &c
 	}
+	if s.data.Backup != nil {
+		b := cloneBackupData(*s.data.Backup)
+		m.Backup = &b
+	}
 	return m
 }
 
@@ -190,6 +216,288 @@ func (s *metaStore) updateSystemConfig(apply func(*SystemConfig)) error {
 	apply(&cur)
 	cc := cloneSystemConfig(cur)
 	s.data.SystemConfig = &cc
+	return s.flushLocked()
+}
+
+// ---- scheduled-backup persistence (channels / schedules / run history) ----
+
+func (s *metaStore) ensureBackupLocked() *BackupData {
+	if s.data.Backup == nil {
+		s.data.Backup = &BackupData{}
+	}
+	return s.data.Backup
+}
+
+func (s *metaStore) listBackupChannels() []backup.Channel {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return nil
+	}
+	return backup.CloneChannels(s.data.Backup.Channels)
+}
+
+func (s *metaStore) getBackupChannel(id string) (backup.Channel, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return backup.Channel{}, false
+	}
+	for _, c := range s.data.Backup.Channels {
+		if c.ID == id {
+			return c.Clone(), true
+		}
+	}
+	return backup.Channel{}, false
+}
+
+// upsertBackupChannel inserts (empty ID → new) or replaces a channel, assigning
+// id/timestamps. Returns the stored copy.
+func (s *metaStore) upsertBackupChannel(ch backup.Channel) (backup.Channel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd := s.ensureBackupLocked()
+	now := time.Now().Unix()
+	if ch.ID == "" {
+		ch.ID = backup.NewID("ch")
+		ch.CreatedAt = now
+		ch.UpdatedAt = now
+		bd.Channels = append(bd.Channels, ch.Clone())
+		if err := s.flushLocked(); err != nil {
+			return backup.Channel{}, err
+		}
+		return ch.Clone(), nil
+	}
+	for i := range bd.Channels {
+		if bd.Channels[i].ID == ch.ID {
+			ch.CreatedAt = bd.Channels[i].CreatedAt
+			ch.UpdatedAt = now
+			bd.Channels[i] = ch.Clone()
+			if err := s.flushLocked(); err != nil {
+				return backup.Channel{}, err
+			}
+			return ch.Clone(), nil
+		}
+	}
+	return backup.Channel{}, ErrNotFound
+}
+
+func (s *metaStore) deleteBackupChannel(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return ErrNotFound
+	}
+	bd := s.data.Backup
+	out := bd.Channels[:0:0]
+	found := false
+	for _, c := range bd.Channels {
+		if c.ID == id {
+			found = true
+			continue
+		}
+		out = append(out, c)
+	}
+	if !found {
+		return ErrNotFound
+	}
+	bd.Channels = out
+	return s.flushLocked()
+}
+
+func (s *metaStore) listBackupSchedules() []backup.Schedule {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return nil
+	}
+	return backup.CloneSchedules(s.data.Backup.Schedules)
+}
+
+func (s *metaStore) getBackupSchedule(id string) (backup.Schedule, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return backup.Schedule{}, false
+	}
+	for _, sc := range s.data.Backup.Schedules {
+		if sc.ID == id {
+			return sc, true
+		}
+	}
+	return backup.Schedule{}, false
+}
+
+func (s *metaStore) upsertBackupSchedule(sc backup.Schedule) (backup.Schedule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd := s.ensureBackupLocked()
+	now := time.Now().Unix()
+	if sc.ID == "" {
+		sc.ID = backup.NewID("sc")
+		sc.CreatedAt = now
+		sc.UpdatedAt = now
+		bd.Schedules = append(bd.Schedules, sc)
+		if err := s.flushLocked(); err != nil {
+			return backup.Schedule{}, err
+		}
+		return sc, nil
+	}
+	for i := range bd.Schedules {
+		if bd.Schedules[i].ID == sc.ID {
+			sc.CreatedAt = bd.Schedules[i].CreatedAt
+			sc.UpdatedAt = now
+			bd.Schedules[i] = sc
+			if err := s.flushLocked(); err != nil {
+				return backup.Schedule{}, err
+			}
+			return sc, nil
+		}
+	}
+	return backup.Schedule{}, ErrNotFound
+}
+
+// updateBackupSchedule applies a mutation to a schedule in-place under the
+// store lock (atomic read-modify-write), avoiding lost updates from concurrent
+// edits. Returns the updated copy or ErrNotFound.
+func (s *metaStore) updateBackupSchedule(id string, apply func(*backup.Schedule)) (backup.Schedule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return backup.Schedule{}, ErrNotFound
+	}
+	for i := range s.data.Backup.Schedules {
+		if s.data.Backup.Schedules[i].ID == id {
+			apply(&s.data.Backup.Schedules[i])
+			s.data.Backup.Schedules[i].ID = id
+			s.data.Backup.Schedules[i].UpdatedAt = time.Now().Unix()
+			sc := s.data.Backup.Schedules[i]
+			if err := s.flushLocked(); err != nil {
+				return backup.Schedule{}, err
+			}
+			return sc, nil
+		}
+	}
+	return backup.Schedule{}, ErrNotFound
+}
+
+// updateBackupChannel applies a mutation to a channel in-place under the store
+// lock (atomic), so a partial update merges against the live stored value
+// (incl. its secret) rather than an API-layer stale snapshot.
+func (s *metaStore) updateBackupChannel(id string, apply func(*backup.Channel)) (backup.Channel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return backup.Channel{}, ErrNotFound
+	}
+	for i := range s.data.Backup.Channels {
+		if s.data.Backup.Channels[i].ID == id {
+			apply(&s.data.Backup.Channels[i])
+			s.data.Backup.Channels[i].ID = id
+			s.data.Backup.Channels[i].UpdatedAt = time.Now().Unix()
+			ch := s.data.Backup.Channels[i].Clone()
+			if err := s.flushLocked(); err != nil {
+				return backup.Channel{}, err
+			}
+			return ch, nil
+		}
+	}
+	return backup.Channel{}, ErrNotFound
+}
+
+func (s *metaStore) deleteBackupSchedule(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return ErrNotFound
+	}
+	bd := s.data.Backup
+	out := bd.Schedules[:0:0]
+	found := false
+	for _, sc := range bd.Schedules {
+		if sc.ID == id {
+			found = true
+			continue
+		}
+		out = append(out, sc)
+	}
+	if !found {
+		return ErrNotFound
+	}
+	bd.Schedules = out
+	return s.flushLocked()
+}
+
+// appendBackupRun appends a run record, trimming history to the newest cap.
+func (s *metaStore) appendBackupRun(r backup.RunRecord, cap int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd := s.ensureBackupLocked()
+	bd.Runs = append(bd.Runs, r)
+	if cap > 0 && len(bd.Runs) > cap {
+		bd.Runs = append([]backup.RunRecord(nil), bd.Runs[len(bd.Runs)-cap:]...)
+	}
+	return s.flushLocked()
+}
+
+// listBackupRuns returns run records newest-first, capped at limit (0 = all).
+func (s *metaStore) listBackupRuns(limit int) []backup.RunRecord {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data.Backup == nil {
+		return nil
+	}
+	runs := s.data.Backup.Runs
+	out := make([]backup.RunRecord, 0, len(runs))
+	for i := len(runs) - 1; i >= 0; i-- {
+		out = append(out, runs[i])
+	}
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+// restoreBackupConfig overwrites channels+schedules from an imported backup
+// (runs are host-local and not restored). Backups carry redacted (blank)
+// secrets, so an imported channel whose secret is blank inherits the secret of
+// the existing same-id channel — a same-host re-import keeps working, while a
+// cross-host restore comes back with the secret unset (re-enter it). Schedules
+// referencing a now-unknown channel are dropped to keep referential integrity.
+func (s *metaStore) restoreBackupConfig(channels []backup.Channel, schedules []backup.Schedule) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bd := s.ensureBackupLocked()
+	if channels != nil {
+		existing := make(map[string]backup.Channel, len(bd.Channels))
+		for _, c := range bd.Channels {
+			existing[c.ID] = c
+		}
+		merged := make([]backup.Channel, len(channels))
+		for i, c := range channels {
+			if old, ok := existing[c.ID]; ok {
+				c = backup.MergeChannelSecrets(old, c) // blank imported secret → keep local
+			}
+			merged[i] = c.Clone()
+		}
+		bd.Channels = merged
+	}
+	if schedules != nil {
+		bd.Schedules = backup.CloneSchedules(schedules)
+	}
+	// Drop schedules whose channel no longer exists (e.g. a channels-less or
+	// hand-trimmed import) so we don't arm cron jobs that can only ever fail.
+	known := make(map[string]bool, len(bd.Channels))
+	for _, c := range bd.Channels {
+		known[c.ID] = true
+	}
+	kept := bd.Schedules[:0:0]
+	for _, sc := range bd.Schedules {
+		if known[sc.ChannelID] {
+			kept = append(kept, sc)
+		}
+	}
+	bd.Schedules = kept
 	return s.flushLocked()
 }
 

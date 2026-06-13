@@ -60,7 +60,7 @@ func TestImportMeta_RestoresBrandingAndOrder(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	br, or, _, err := m.ImportMeta(blob)
+	br, or, _, _, err := m.ImportMeta(blob)
 	if err != nil {
 		t.Fatalf("ImportMeta: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestImportMeta_OrderOnly(t *testing.T) {
 	}
 	blob, _ := json.Marshal(Meta{Version: 1, Sort: []string{"b", "a"}})
 
-	br, or, _, err := m.ImportMeta(blob)
+	br, or, _, _, err := m.ImportMeta(blob)
 	if err != nil {
 		t.Fatalf("ImportMeta: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestImportMeta_UnknownIDsFiltered(t *testing.T) {
 	// gone 不存在；b 在前 a 在后
 	blob, _ := json.Marshal(Meta{Version: 1, Sort: []string{"gone", "b", "a"}})
 
-	if _, or, _, err := m.ImportMeta(blob); err != nil || !or {
+	if _, or, _, _, err := m.ImportMeta(blob); err != nil || !or {
 		t.Fatalf("ImportMeta: or=%v err=%v", or, err)
 	}
 	if got := listIDs(m); len(got) != 2 || got[0] != "b" || got[1] != "a" {
@@ -123,11 +123,11 @@ func TestImportMeta_UnknownIDsFiltered(t *testing.T) {
 // 损坏的 meta.json：返回错误、不 panic、不改动现状。
 func TestImportMeta_InvalidJSON(t *testing.T) {
 	m := newImportTestManager(t)
-	br, or, sc, err := m.ImportMeta([]byte("{not json"))
+	br, or, sc, bk, err := m.ImportMeta([]byte("{not json"))
 	if err == nil {
 		t.Fatalf("expected error on invalid json")
 	}
-	if br || or || sc {
+	if br || or || sc || bk {
 		t.Fatalf("nothing should be restored on invalid json")
 	}
 }
@@ -145,7 +145,7 @@ func TestImportMeta_RestoresSystemConfig(t *testing.T) {
 		},
 	})
 
-	_, _, sc, err := m.ImportMeta(blob)
+	_, _, sc, _, err := m.ImportMeta(blob)
 	if err != nil {
 		t.Fatalf("ImportMeta: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestImportMeta_RestoresSystemConfig(t *testing.T) {
 	// 全 nil 的 system_config 不应被当作「有覆盖」上报。
 	m2 := newImportTestManager(t)
 	blob2, _ := json.Marshal(Meta{Version: 1, SystemConfig: &SystemConfig{}})
-	if _, _, sc2, err := m2.ImportMeta(blob2); err != nil || sc2 {
+	if _, _, sc2, _, err := m2.ImportMeta(blob2); err != nil || sc2 {
 		t.Fatalf("empty system_config should not count as restored: sc=%v err=%v", sc2, err)
 	}
 }

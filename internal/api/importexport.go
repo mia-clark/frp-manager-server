@@ -10,25 +10,26 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/mia-clark/frpc-manager/internal/backup"
 	"github.com/mia-clark/frpc-manager/internal/manager"
 	"github.com/mia-clark/frpc-manager/pkg/config"
 )
 
 // ImportExportHandler implements /api/v1/import/* and /api/v1/export/*.
 type ImportExportHandler struct {
-	m   *manager.Manager
-	log *slog.Logger
+	m     *manager.Manager
+	log   *slog.Logger
+	sched *backup.Scheduler // may be nil; reloaded after a backup-config restore
 }
 
-// NewImportExportHandler builds a handler.
-func NewImportExportHandler(m *manager.Manager, log *slog.Logger) *ImportExportHandler {
-	return &ImportExportHandler{m: m, log: log}
+// NewImportExportHandler builds a handler. sched may be nil.
+func NewImportExportHandler(m *manager.Manager, log *slog.Logger, sched *backup.Scheduler) *ImportExportHandler {
+	return &ImportExportHandler{m: m, log: log, sched: sched}
 }
 
 // ImportFile handles a multipart upload with a single ".toml/.ini/.conf"
@@ -158,11 +159,17 @@ func (h *ImportExportHandler) ImportZIP(w http.ResponseWriter, r *http.Request) 
 		imported = append(imported, id)
 	}
 
-	brandingRestored, orderRestored, systemConfigRestored := false, false, false
+	brandingRestored, orderRestored, systemConfigRestored, backupRestored := false, false, false, false
 	if len(metaRaw) > 0 {
 		var err error
-		if brandingRestored, orderRestored, systemConfigRestored, err = h.m.ImportMeta(metaRaw); err != nil {
+		if brandingRestored, orderRestored, systemConfigRestored, backupRestored, err = h.m.ImportMeta(metaRaw); err != nil {
 			h.log.Warn("restore meta from import failed", slog.Any("err", err))
+		}
+	}
+	// Restored schedules must re-arm the cron registry without a restart.
+	if backupRestored && h.sched != nil {
+		if err := h.sched.Reload(); err != nil {
+			h.log.Warn("reload backup scheduler after import failed", slog.Any("err", err))
 		}
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{
@@ -170,6 +177,7 @@ func (h *ImportExportHandler) ImportZIP(w http.ResponseWriter, r *http.Request) 
 		"branding_restored":      brandingRestored,
 		"order_restored":         orderRestored,
 		"system_config_restored": systemConfigRestored,
+		"backup_restored":        backupRestored,
 	})
 }
 
@@ -186,38 +194,15 @@ func (h *ImportExportHandler) ExportConfig(w http.ResponseWriter, r *http.Reques
 }
 
 // ExportAll returns a zip archive of every config file plus meta.json, so a
-// backup also carries the operator's branding (and display order). Import via
-// /import/zip restores the configs and re-applies the branding.
+// backup also carries the operator's branding / order / system_config / backup
+// config. Import via /import/zip restores them. The archive contents are built
+// by manager.BuildBackupZip — the same payload the scheduled-backup engine
+// uploads — so manual and automatic backups are byte-for-byte equivalent.
 func (h *ImportExportHandler) ExportAll(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="frpmgr-export-%s.zip"`, time.Now().UTC().Format("20060102-150405")))
-
-	zw := zip.NewWriter(w)
-	defer zw.Close()
-
-	matches, _ := filepath.Glob(filepath.Join(h.m.ProfilesDir(), "*.toml"))
-	for _, ext := range []string{"*.conf", "*.ini"} {
-		extra, _ := filepath.Glob(filepath.Join(h.m.ProfilesDir(), ext))
-		matches = append(matches, extra...)
-	}
-	for _, p := range matches {
-		raw, err := os.ReadFile(p)
-		if err != nil {
-			continue
-		}
-		fw, err := zw.Create("profiles/" + filepath.Base(p))
-		if err != nil {
-			continue
-		}
-		_, _ = fw.Write(raw)
-	}
-
-	// Bundle meta.json (branding / sort) so the backup is self-contained. Best
-	// effort: a missing/unreadable meta.json just yields a config-only archive.
-	if metaRaw, err := os.ReadFile(h.m.MetaPath()); err == nil {
-		if fw, err := zw.Create("meta.json"); err == nil {
-			_, _ = fw.Write(metaRaw)
-		}
+	if err := h.m.BuildBackupZip(w); err != nil {
+		h.log.Warn("export all failed", slog.Any("err", err))
 	}
 }
 

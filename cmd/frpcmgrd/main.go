@@ -14,6 +14,7 @@ import (
 
 	"github.com/mia-clark/frpc-manager/internal/api"
 	"github.com/mia-clark/frpc-manager/internal/appcfg"
+	"github.com/mia-clark/frpc-manager/internal/backup"
 	"github.com/mia-clark/frpc-manager/internal/eventbus"
 	"github.com/mia-clark/frpc-manager/internal/manager"
 	"github.com/mia-clark/frpc-manager/pkg/version"
@@ -111,7 +112,15 @@ func runServe(args []string) int {
 	mgr.AutoStart()
 	defer mgr.Shutdown()
 
-	handler := api.NewRouter(api.Deps{Cfg: cfg, Logger: logger, Manager: mgr, LogLevel: levelVar})
+	// Scheduled-backup engine: cron-driven uploads of the config export to the
+	// configured storage channels. Started after AutoStart so a backup's payload
+	// reflects the running set; stopped before the manager shuts down.
+	host, _ := os.Hostname()
+	sched := backup.NewScheduler(mgr, mgr, mgr, bus, logger, host)
+	sched.Start()
+	defer sched.Stop()
+
+	handler := api.NewRouter(api.Deps{Cfg: cfg, Logger: logger, Manager: mgr, LogLevel: levelVar, Backup: sched})
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           handler,

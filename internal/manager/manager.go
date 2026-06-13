@@ -1,10 +1,12 @@
 package manager
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mia-clark/frpc-manager/internal/backup"
 	"github.com/mia-clark/frpc-manager/internal/eventbus"
 	"github.com/mia-clark/frpc-manager/pkg/config"
 	"github.com/mia-clark/frpc-manager/pkg/consts"
@@ -681,6 +684,116 @@ func (m *Manager) UpdateSystemConfig(apply func(*SystemConfig)) error {
 	return m.meta.updateSystemConfig(apply)
 }
 
+// ---- scheduled-backup config (satisfies backup.Store / Recorder) ----
+
+// ListBackupChannels returns all configured storage channels (with secrets).
+func (m *Manager) ListBackupChannels() []backup.Channel { return m.meta.listBackupChannels() }
+
+// GetBackupChannel returns a channel by id.
+func (m *Manager) GetBackupChannel(id string) (backup.Channel, bool) {
+	return m.meta.getBackupChannel(id)
+}
+
+// UpsertBackupChannel inserts (empty id) or replaces a storage channel.
+func (m *Manager) UpsertBackupChannel(ch backup.Channel) (backup.Channel, error) {
+	return m.meta.upsertBackupChannel(ch)
+}
+
+// DeleteBackupChannel removes a storage channel by id.
+func (m *Manager) DeleteBackupChannel(id string) error { return m.meta.deleteBackupChannel(id) }
+
+// ListBackupSchedules returns all backup schedules.
+func (m *Manager) ListBackupSchedules() []backup.Schedule { return m.meta.listBackupSchedules() }
+
+// GetBackupSchedule returns a schedule by id.
+func (m *Manager) GetBackupSchedule(id string) (backup.Schedule, bool) {
+	return m.meta.getBackupSchedule(id)
+}
+
+// UpsertBackupSchedule inserts (empty id) or replaces a backup schedule.
+func (m *Manager) UpsertBackupSchedule(sc backup.Schedule) (backup.Schedule, error) {
+	return m.meta.upsertBackupSchedule(sc)
+}
+
+// DeleteBackupSchedule removes a schedule by id.
+func (m *Manager) DeleteBackupSchedule(id string) error { return m.meta.deleteBackupSchedule(id) }
+
+// UpdateBackupSchedule atomically mutates a schedule under the store lock.
+func (m *Manager) UpdateBackupSchedule(id string, apply func(*backup.Schedule)) (backup.Schedule, error) {
+	return m.meta.updateBackupSchedule(id, apply)
+}
+
+// UpdateBackupChannel atomically mutates a channel under the store lock.
+func (m *Manager) UpdateBackupChannel(id string, apply func(*backup.Channel)) (backup.Channel, error) {
+	return m.meta.updateBackupChannel(id, apply)
+}
+
+// AppendBackupRun records a completed backup run (capped history).
+func (m *Manager) AppendBackupRun(r backup.RunRecord) error {
+	return m.meta.appendBackupRun(r, backup.RunHistoryCap)
+}
+
+// ListBackupRuns returns the run history newest-first, capped at limit.
+func (m *Manager) ListBackupRuns(limit int) []backup.RunRecord { return m.meta.listBackupRuns(limit) }
+
+// BuildBackupZip writes a zip archive of every config file plus meta.json to w.
+// It is the single source of truth for "what a backup contains", shared by the
+// HTTP /export/all handler and the scheduled-backup engine.
+func (m *Manager) BuildBackupZip(w io.Writer) error {
+	zw := zip.NewWriter(w)
+	matches, _ := filepath.Glob(filepath.Join(m.opts.ProfilesDir, "*.toml"))
+	for _, ext := range []string{"*.conf", "*.ini"} {
+		extra, _ := filepath.Glob(filepath.Join(m.opts.ProfilesDir, ext))
+		matches = append(matches, extra...)
+	}
+	for _, p := range matches {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		fw, err := zw.Create("profiles/" + filepath.Base(p))
+		if err != nil {
+			continue
+		}
+		if _, err := fw.Write(raw); err != nil {
+			_ = zw.Close()
+			return err
+		}
+	}
+	// Bundle meta.json (branding / sort / system_config / backup config) so the
+	// archive is self-contained. Storage-channel secrets are REDACTED first so
+	// credentials never ride along into the (possibly shared) backup target or
+	// an exported download. Best effort: a missing meta yields config-only.
+	if metaRaw, err := os.ReadFile(m.opts.MetaPath); err == nil {
+		out := redactBackupSecrets(metaRaw)
+		if fw, err := zw.Create("meta.json"); err == nil {
+			_, _ = fw.Write(out)
+		}
+	}
+	return zw.Close()
+}
+
+// redactBackupSecrets parses a meta.json blob and blanks every backup channel's
+// secret, returning the re-serialized bytes. On a parse error (not expected for
+// our own file) it falls back to the original bytes rather than dropping the
+// branding/order the archive also needs.
+func redactBackupSecrets(raw []byte) []byte {
+	var m Meta
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return raw
+	}
+	if m.Backup != nil {
+		for i := range m.Backup.Channels {
+			m.Backup.Channels[i] = backup.RedactSecrets(m.Backup.Channels[i])
+		}
+	}
+	out, err := json.MarshalIndent(&m, "", "  ")
+	if err != nil {
+		return raw
+	}
+	return out
+}
+
 // GetBranding returns the effective UI branding — stored overrides with the
 // Default* constants filled in for any empty field, so callers always get a
 // ready-to-render value.
@@ -720,11 +833,12 @@ func (m *Manager) SetBranding(in Branding) (Branding, error) {
 // CORS take effect immediately (read live per-request) while a restored log
 // level applies on the next restart (re-armed by NewRuntimeConfig).
 //
-// Returns whether a non-empty branding, order, and system_config were applied.
-func (m *Manager) ImportMeta(raw []byte) (brandingRestored, orderRestored, systemConfigRestored bool, err error) {
+// Returns whether a non-empty branding, order, system_config, and backup config
+// were applied.
+func (m *Manager) ImportMeta(raw []byte) (brandingRestored, orderRestored, systemConfigRestored, backupRestored bool, err error) {
 	var meta Meta
 	if err := json.Unmarshal(raw, &meta); err != nil {
-		return false, false, false, err
+		return false, false, false, false, err
 	}
 	// Branding and order are restored independently: a failure on one is
 	// recorded but never blocks the other (first error is returned).
@@ -763,7 +877,17 @@ func (m *Manager) ImportMeta(raw []byte) (brandingRestored, orderRestored, syste
 			systemConfigRestored = true
 		}
 	}
-	return brandingRestored, orderRestored, systemConfigRestored, err
+	// Restore backup channels + schedules (runs are host-local, not restored).
+	if bd := meta.Backup; bd != nil && (len(bd.Channels) > 0 || len(bd.Schedules) > 0) {
+		if e := m.meta.restoreBackupConfig(bd.Channels, bd.Schedules); e != nil {
+			if err == nil {
+				err = e
+			}
+		} else {
+			backupRestored = true
+		}
+	}
+	return brandingRestored, orderRestored, systemConfigRestored, backupRestored, err
 }
 
 // truncateRunes caps s to at most max runes (not bytes), so multi-byte CJK

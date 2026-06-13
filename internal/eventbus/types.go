@@ -13,6 +13,9 @@ const (
 	TypeConfigChanged    EventType = "config.changed"
 	TypeConfigDeleted    EventType = "config.deleted"
 	TypeLogLine          EventType = "log.line"
+	// TypeBackupRun fires when a scheduled/manual backup starts or finishes; the
+	// payload is the backup run record so the UI can live-update its history.
+	TypeBackupRun EventType = "backup.run"
 )
 
 // Event is a single message published on the bus. Data is the type-

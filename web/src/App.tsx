@@ -12,6 +12,7 @@ const SystemPage = lazy(() => import('./pages/System'));
 const ToolsValidate = lazy(() => import('./pages/ToolsValidate'));
 const ToolsNat = lazy(() => import('./pages/ToolsNat'));
 const TomlReference = lazy(() => import('./pages/TomlReference'));
+const Backup = lazy(() => import('./pages/Backup'));
 const Settings = lazy(() => import('./pages/Settings'));
 const About = lazy(() => import('./pages/About'));
 
@@ -48,6 +49,7 @@ function App() {
               <Route path="reference" element={<TomlReference />} />
             </Route>
             <Route path="import-export" element={<ImportExport />} />
+            <Route path="backup" element={<Backup />} />
             <Route path="settings" element={<Settings />} />
             <Route path="about" element={<About />} />
             <Route path="help" element={<Navigate to="/about" replace />} />

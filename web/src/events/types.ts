@@ -6,7 +6,8 @@ export type EventType =
   | 'proxy.connections'
   | 'config.changed'
   | 'config.deleted'
-  | 'log.line';
+  | 'log.line'
+  | 'backup.run';
 
 export interface BusEvent<T = unknown> {
   seq: number;

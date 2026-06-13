@@ -149,6 +149,138 @@ paths:
       responses:
         '200': { description: 'OK — same shape as GET' }
         '400': { description: Invalid log_level or empty cors_origins }
+
+  /api/v1/backup/channels:
+    get:
+      tags: [backup]
+      summary: List storage channels (secrets masked)
+      description: >
+        Returns { channels: [...] }. Each channel omits its secret and exposes a
+        *_set boolean (secret_access_key_set / password_set) instead.
+      responses: { '200': { description: OK } }
+    post:
+      tags: [backup]
+      summary: Create a storage channel (s3 | webdav)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, kind]
+              properties:
+                name: { type: string }
+                kind: { type: string, enum: [s3, webdav] }
+                s3:
+                  type: object
+                  properties:
+                    endpoint: { type: string, description: 'host[:port], no scheme' }
+                    region: { type: string }
+                    bucket: { type: string }
+                    access_key_id: { type: string }
+                    secret_access_key: { type: string }
+                    prefix: { type: string }
+                    use_ssl: { type: boolean }
+                    path_style: { type: boolean }
+                webdav:
+                  type: object
+                  properties:
+                    base_url: { type: string }
+                    username: { type: string }
+                    password: { type: string }
+                    prefix: { type: string }
+      responses:
+        '201': { description: Created (masked channel) }
+        '400': { description: Validation error }
+  /api/v1/backup/channels/test:
+    post:
+      tags: [backup]
+      summary: Test an unsaved channel config (no write)
+      description: >
+        Body is a channel object. If it carries an id of an existing channel and
+        leaves the secret blank, the stored secret is reused. Returns
+        { ok, error } — a failed test is a 200 result, not an HTTP error.
+      responses: { '200': { description: 'OK — { ok: boolean, error?: string }' } }
+  /api/v1/backup/channels/{id}:
+    put:
+      tags: [backup]
+      summary: Update a channel (blank secret = keep current)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: OK (masked channel) }
+        '404': { description: Channel not found }
+    delete:
+      tags: [backup]
+      summary: Delete a channel (409 if referenced by a schedule)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: OK }
+        '404': { description: Not found }
+        '409': { description: Referenced by a schedule }
+  /api/v1/backup/channels/{id}/test:
+    post:
+      tags: [backup]
+      summary: Test a stored channel's connectivity
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: 'OK — { ok, error? }' } }
+  /api/v1/backup/schedules:
+    get:
+      tags: [backup]
+      summary: List backup schedules (with running flag + last_run)
+      responses: { '200': { description: OK } }
+    post:
+      tags: [backup]
+      summary: Create a backup schedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, channel_id, cron]
+              properties:
+                name: { type: string }
+                enabled: { type: boolean }
+                cron: { type: string, description: '5-field cron or @descriptor' }
+                channel_id: { type: string }
+                path_template: { type: string }
+                retention: { type: integer, description: 'keep newest N, 0 = unlimited' }
+      responses:
+        '201': { description: Created }
+        '400': { description: Validation error / unknown channel }
+  /api/v1/backup/schedules/{id}:
+    put:
+      tags: [backup]
+      summary: Update a schedule
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK }, '400': { description: Invalid }, '404': { description: Not found } }
+    delete:
+      tags: [backup]
+      summary: Delete a schedule
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK }, '404': { description: Not found } }
+  /api/v1/backup/schedules/{id}/toggle:
+    post:
+      tags: [backup]
+      summary: Enable / disable a schedule (reloads cron)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses: { '200': { description: OK }, '404': { description: Not found } }
+  /api/v1/backup/schedules/{id}/run:
+    post:
+      tags: [backup]
+      summary: Trigger a manual backup now (async)
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '202': { description: Started }
+        '404': { description: Not found }
+        '409': { description: Already running }
+  /api/v1/backup/runs:
+    get:
+      tags: [backup]
+      summary: Backup run history (newest first)
+      parameters: [{ name: limit, in: query, schema: { type: integer, default: 50 } }]
+      responses: { '200': { description: 'OK — { runs: [...] }' } }
+
   /api/v1/configs:
     get:
       tags: [configs]
